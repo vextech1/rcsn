@@ -1,0 +1,46 @@
+name: Deploy Firebase
+
+# Runs after CI succeeds on main, or manually from the Actions tab.
+# Deploys Firestore rules and indexes, then Storage rules.
+# Cloud Functions are NOT deployed here (needs the Blaze plan).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT" || { echo "::error::Secret FIREBASE_SERVICE_ACCOUNT is empty or missing"; exit 1; }
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          python3 -c "import json,os;d=json.load(open(os.environ['GOOGLE_APPLICATION_CREDENTIALS']));print('credentials for project', d.get('project_id'))"
+
+      - name: Deploy Firestore rules and indexes
+        run: npx -y firebase-tools deploy --only firestore:rules,firestore:indexes --project school-msa --non-interactive
+
+      - name: Deploy Storage rules
+        continue-on-error: true
+        run: npx -y firebase-tools deploy --only storage --project school-msa --non-interactive
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
