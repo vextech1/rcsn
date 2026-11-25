@@ -59,6 +59,9 @@ beforeEach(async () => {
     await setDoc(doc(db, 'staff/bursar1'), staff('Bursar', 'bursar'));
     await setDoc(doc(db, 'tutors/tutor1'), { name: 'T', email: 't@example.com', status: 'active' });
     await setDoc(doc(db, 'tutors/tutor2'), { name: 'S', email: 's@example.com', status: 'suspended' });
+    await setDoc(doc(db, 'tutors/tutor3'), { name: 'U', email: 'u@example.com', status: 'active' });
+    await setDoc(doc(db, 'tutor_assignments/tutor1_s1'), { tutorId: 'tutor1', subjectId: 's1' });
+    await setDoc(doc(db, 'tutor_assignments/tutor2_s1'), { tutorId: 'tutor2', subjectId: 's1' });
     await setDoc(doc(db, 'subjects/s1'), subject);
     await setDoc(doc(db, 'students/stu1'), { nsin: 'X', name: 'Student', status: 'active' });
     await setDoc(doc(db, 'admins/legacy'), { name: 'Old', email: 'old@example.com' });
@@ -141,5 +144,37 @@ describe('academic structure writes (transitional: principal or registrar)', () 
   it('a suspended tutor cannot suspend or edit other tutors', async () => {
     await assertFails(updateDoc(doc(as('tutor2'), 'tutors/tutor1'), { status: 'suspended' }));
     await assertFails(updateDoc(doc(as('tutor1'), 'tutors/tutor2'), { status: 'active' }));
+  });
+});
+
+describe('content uploads (assignment check)', () => {
+  const item = (tutorId) => ({
+    subjectId: 's1',
+    contentTypeId: 'ct1',
+    fileName: 'notes.pdf',
+    fileUrl: 'https://example.com/notes.pdf',
+    storagePath: 'subjects/s1/content/notes.pdf',
+    isArchived: false,
+    uploadedByTutorId: tutorId,
+  });
+
+  it('an active tutor assigned to the subject can upload', async () => {
+    await assertSucceeds(setDoc(doc(as('tutor1'), 'content_items/c1'), item('tutor1')));
+  });
+
+  it('an active tutor NOT assigned to the subject cannot', async () => {
+    await assertFails(setDoc(doc(as('tutor3'), 'content_items/c2'), item('tutor3')));
+  });
+
+  it('a suspended tutor cannot, even if still assigned', async () => {
+    await assertFails(setDoc(doc(as('tutor2'), 'content_items/c3'), item('tutor2')));
+  });
+
+  it('a tutor cannot upload on behalf of another tutor', async () => {
+    await assertFails(setDoc(doc(as('tutor1'), 'content_items/c4'), item('tutor3')));
+  });
+
+  it('a signed-out user cannot upload', async () => {
+    await assertFails(setDoc(doc(anon(), 'content_items/c5'), item('tutor1')));
   });
 });

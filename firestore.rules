@@ -51,9 +51,12 @@ service cloud.firestore {
     /// True if the given tutor is assigned to the given subject.
     /// Relies on tutor_assignments documents using composite IDs:
     /// `{tutorId}_{subjectId}` — see the note on tutor_assignments below.
+    /// (Rules paths only allow a whole-segment `$(expr)`, so the composite
+    /// ID is built with string concatenation inside one `$()`. The earlier
+    /// `$(a)_$(b)` form did not compile, so no rules could be deployed.)
     function isAssignedToSubject(tutorId, subjectId) {
       return exists(
-        /databases/$(database)/documents/tutor_assignments/$(tutorId)_$(subjectId)
+        /databases/$(database)/documents/tutor_assignments/$(tutorId + '_' + subjectId)
       );
     }
 
