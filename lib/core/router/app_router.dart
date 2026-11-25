@@ -182,6 +182,17 @@ String? _guard(
       return AppRoutes.tutorAccountInactive;
     }
 
+    // A student whose saved NSIN has been re-resolved on launch goes
+    // straight in, same as a signed-in tutor or staff member. While the
+    // saved session is still being restored, stay put; the provider's
+    // notifyListeners() re-runs this guard when it finishes.
+    if (!student.isRestoring) {
+      if (student.isUsableSession) return AppRoutes.studentDashboard;
+      if (student.currentStudent != null) {
+        return AppRoutes.studentAccountInactive;
+      }
+    }
+
     return null;
   }
 
@@ -251,7 +262,20 @@ String? _guard(
   // STUDENT routes
   // ---------------------------------------------------------------
   if (isStudentRoute) {
-    if (isStudentPublicRoute) return null;
+    if (isStudentPublicRoute) {
+      // The NSIN entry screen must stay reachable without a session, but
+      // a student whose NSIN has been found must never be left on the
+      // form: StudentSearchScreen shows "Loading your account..." in
+      // that state and relies on this redirect to move on. Without it
+      // the spinner never ends.
+      if (student.isRestoring) return null;
+      if (student.isUsableSession) return AppRoutes.studentDashboard;
+      if (student.currentStudent != null) {
+        // Found, but suspended or terminated: not usable, so explain why.
+        return AppRoutes.studentAccountInactive;
+      }
+      return null;
+    }
     if (path == AppRoutes.studentAccountInactive) return null;
     if (path == AppRoutes.studentSettings) {
       // Settings must stay reachable even for an inactive session. This
