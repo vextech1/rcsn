@@ -43,11 +43,12 @@ service cloud.firestore {
       // (RoleSelectScreen calls AdminRepository.adminExists()).
       allow read: if request.auth != null;
 
-      // Create: only if no admin exists yet (first-run setup guard).
-      // The document ID must match the authenticated user's UID.
-      allow create: if request.auth != null
-        && request.auth.uid == adminId
-        && !exists(/databases/$(database)/documents/admins/$(adminId));
+      // Create: DISABLED (Phase 0 hotfix). The previous rule only checked
+      // that the caller's own doc did not exist, which is true for every
+      // new user, so any signed-in user could make themselves admin.
+      // The Principal is created by a local Admin SDK bootstrap script
+      // (Phase 1); there is no client-side creation path.
+      allow create: if false;
 
       // Update: only the admin themselves can update their own doc.
       allow update: if isAdmin() && request.auth.uid == adminId;
