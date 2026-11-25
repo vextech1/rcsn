@@ -74,11 +74,11 @@ jobs:
         run: flutter test
         continue-on-error: true
 
-      - name: Build debug APK
+      - name: Build release APKs (one per ABI)
         shell: bash
         run: |
           set -o pipefail
-          flutter build apk --debug -v 2>&1 | tee build.log
+          flutter build apk --release --split-per-abi -v 2>&1 | tee build.log
 
       - name: Surface build errors
         if: failure()
@@ -93,10 +93,7 @@ jobs:
           msg=$(python3 -c "import urllib.parse;print(urllib.parse.quote(open('summary.txt').read()[:12000],safe=' /:.,;()[]{}<>=-_\\'\"'))")
           echo "::error title=BUILD-LOG::${msg}"
 
-      - name: Build release APK (debug-signed for now)
-        run: flutter build apk --release
-
       - uses: actions/upload-artifact@v4
         with:
           name: rcsn-apks
-          path: build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/*-release.apk
