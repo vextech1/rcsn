@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "495290949103",
-    "project_id": "rcsn-765ff",
-    "storage_bucket": "rcsn-765ff.firebasestorage.app"
+    "project_number": "185183953048",
+    "project_id": "school-msa",
+    "storage_bucket": "school-msa.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:495290949103:android:f5b6927579ceaf7add6a1a",
+        "mobilesdk_app_id": "1:185183953048:android:4a94342e1eed8bc48430ed",
         "android_client_info": {
-          "package_name": "com.andrew.rcsn"
+          "package_name": "com.school.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "185183953048-0p7mdek5ovnl5m4l87e4qbfgrp68rt1n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAEX9jeKZ4gvaO6D14BXpgKI9LgTHG_aoE"
+          "current_key": "AIzaSyB3iJM2v3sIcNH6_XQyjrzBHs0L5fOVnXw"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "185183953048-0p7mdek5ovnl5m4l87e4qbfgrp68rt1n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

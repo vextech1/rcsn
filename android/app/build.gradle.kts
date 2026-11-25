@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.andrew.rcsn"
+    namespace = "com.school.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -18,7 +18,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.andrew.rcsn"
+        applicationId = "com.school.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -14,7 +14,7 @@
 // same Auth uid, so the same email and password keep working):
 //   node scripts/bootstrap-principal.js --from-admin [--delete-legacy]
 //
-// Optional: --project <id> (defaults to rcsn-765ff).
+// Optional: --project <id> (defaults to school-msa).
 //
 // Refuses to run if a Principal already exists. Also seeds the default
 // content types if none exist (the old in-app first-run setup did this).
@@ -41,7 +41,7 @@ function fail(message) {
 }
 
 async function main() {
-  const projectId = arg('project') || process.env.GCLOUD_PROJECT || 'rcsn-765ff';
+  const projectId = arg('project') || process.env.GCLOUD_PROJECT || 'school-msa';
   admin.initializeApp({ projectId });
   const db = admin.firestore();
   const auth = admin.auth();

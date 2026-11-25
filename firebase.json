@@ -3,16 +3,16 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "rcsn-765ff",
-          "appId": "1:495290949103:android:f5b6927579ceaf7add6a1a",
+          "projectId": "school-msa",
+          "appId": "1:185183953048:android:4a94342e1eed8bc48430ed",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "rcsn-765ff",
+          "projectId": "school-msa",
           "configurations": {
-            "android": "1:495290949103:android:f5b6927579ceaf7add6a1a",
+            "android": "1:185183953048:android:4a94342e1eed8bc48430ed",
             "ios": "1:495290949103:ios:d06ab86a9bf4b8cbdd6a1a",
             "macos": "1:495290949103:ios:d06ab86a9bf4b8cbdd6a1a",
             "web": "1:495290949103:web:16fb2c9b9464ab1bdd6a1a",
