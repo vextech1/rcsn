@@ -36,7 +36,23 @@ jobs:
         continue-on-error: true
 
       - name: Build debug APK
-        run: flutter build apk --debug
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build apk --debug -v 2>&1 | tee build.log
+
+      - name: Surface build errors
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "=== ERROR LINES ==="
+            grep -n -E "^e: |error:|What went wrong|FAILURE|Execution failed|Could not|not found|Unresolved|Exception" build.log | head -60
+            echo "=== TAIL ==="
+            tail -60 build.log
+          } > summary.txt
+          msg=$(python3 -c "import urllib.parse;print(urllib.parse.quote(open('summary.txt').read()[:12000],safe=' /:.,;()[]{}<>=-_\\'\"'))")
+          echo "::error title=BUILD-LOG::${msg}"
 
       - name: Build release APK (debug-signed for now)
         run: flutter build apk --release
