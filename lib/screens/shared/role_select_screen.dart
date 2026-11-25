@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../providers/auth_provider.dart';
 
 /// The Staff / Tutor / Student entry point.
@@ -11,56 +13,74 @@ import '../../providers/auth_provider.dart';
 /// dashboard they land on is decided after sign-in from their `staff`
 /// record. There is no pre-sign-in "does an admin exist" check any more:
 /// the Principal is created by a one-time bootstrap script, never in-app.
+///
+/// NOTE ON THEME: like the welcome screen this is deliberately a fixed
+/// brand-colour hero screen regardless of system light/dark mode: solid
+/// AppColors.primary background, white text, white buttons with primary-
+/// coloured labels. Colours are set explicitly here rather than read from
+/// Theme.of(context), so the two entry screens always look like one flow.
 class RoleSelectScreen extends StatelessWidget {
   const RoleSelectScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('RCSN Mobile App')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Continue as',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textDark,
+      backgroundColor: AppColors.primary,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.local_hospital,
+                size: 64,
+                color: Colors.white,
               ),
-            ),
-            const SizedBox(height: 32),
-            _RoleButton(
-              label: 'Staff',
-              icon: Icons.admin_panel_settings,
-              // Clear any error left over from a previous, abandoned
-              // login attempt before this fresh navigation. See
-              // AuthProvider.clearError for why this happens HERE and
-              // not inside the login screen. push, not go: this is a
-              // forward drill-down, so back returns to this screen.
-              onTap: () {
-                context.read<AuthProvider>().clearError();
-                context.push(AppRoutes.staffLogin);
-              },
-            ),
-            const SizedBox(height: 16),
-            _RoleButton(
-              label: 'Tutor',
-              icon: Icons.school,
-              onTap: () {
-                context.read<AuthProvider>().clearError();
-                context.push(AppRoutes.tutorLogin);
-              },
-            ),
-            const SizedBox(height: 16),
-            _RoleButton(
-              label: 'Student',
-              icon: Icons.person,
-              onTap: () => context.push(AppRoutes.studentSearch),
-            ),
-          ],
+              const SizedBox(height: 24),
+              Text(
+                'Continue as',
+                textAlign: TextAlign.center,
+                style: AppTypography.heading2(context).copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: 40),
+              _RoleButton(
+                label: 'Staff',
+                icon: Icons.admin_panel_settings,
+                // Clear any error left over from a previous, abandoned
+                // login attempt before this fresh navigation. See
+                // AuthProvider.clearError for why this happens HERE and
+                // not inside the login screen. push, not go: this is a
+                // forward drill-down, so back returns to this screen.
+                onTap: () {
+                  context.read<AuthProvider>().clearError();
+                  context.push(AppRoutes.staffLogin);
+                },
+              ),
+              const SizedBox(height: 16),
+              _RoleButton(
+                label: 'Tutor',
+                icon: Icons.school,
+                onTap: () {
+                  context.read<AuthProvider>().clearError();
+                  context.push(AppRoutes.tutorLogin);
+                },
+              ),
+              const SizedBox(height: 16),
+              _RoleButton(
+                label: 'Student',
+                icon: Icons.person,
+                onTap: () => context.push(AppRoutes.studentSearch),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -80,20 +100,22 @@ class _RoleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Same look as the welcome screen's Continue button: white fill,
+    // primary-coloured label.
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.primary,
           padding: const EdgeInsets.symmetric(vertical: 18),
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         onPressed: onTap,
         icon: Icon(icon, color: AppColors.primary),
         label: Text(
           label,
-          style: const TextStyle(
+          style: AppTypography.button(context).copyWith(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
             color: AppColors.primary,
           ),
         ),
