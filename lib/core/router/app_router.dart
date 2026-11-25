@@ -6,9 +6,11 @@ import '../../providers/student_provider.dart';
 import '../constants/user_role.dart';
 import '../../screens/shared/welcome_screen.dart';
 import '../../screens/shared/role_select_screen.dart';
-import '../../screens/admin/setup/admin_setup_screen.dart';
-import '../../screens/admin/auth/admin_login_screen.dart';
-import '../../screens/admin/dashboard/admin_dashboard_screen.dart';
+import '../../screens/staff/auth/staff_login_screen.dart';
+import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
+import '../../screens/principal/staff/principal_staff_screen.dart';
+import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
+import '../../screens/bursar/dashboard/bursar_dashboard_screen.dart';
 import '../../screens/admin/structure/admin_structure_screen.dart';
 import '../../screens/admin/tutors/admin_tutors_screen.dart';
 import '../../screens/admin/students/admin_students_screen.dart';
@@ -88,14 +90,22 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: AppRoutes.roleSelect, builder: (_, __) => const RoleSelectScreen()),
 
-      // Admin
-      GoRoute(path: AppRoutes.adminSetup, builder: (_, __) => const AdminSetupScreen()),
-      GoRoute(path: AppRoutes.adminLogin, builder: (_, __) => const AdminLoginScreen()),
-      GoRoute(path: AppRoutes.adminDashboard, builder: (_, __) => const AdminDashboardScreen()),
-      GoRoute(path: AppRoutes.adminStructure, builder: (_, __) => const AdminStructureScreen()),
-      GoRoute(path: AppRoutes.adminTutors, builder: (_, __) => const AdminTutorsScreen()),
-      GoRoute(path: AppRoutes.adminStudents, builder: (_, __) => const AdminStudentsScreen()),
-      GoRoute(path: AppRoutes.adminContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
+      // Staff
+      GoRoute(path: AppRoutes.staffLogin, builder: (_, __) => const StaffLoginScreen()),
+
+      // Principal
+      GoRoute(path: AppRoutes.principalDashboard, builder: (_, __) => const PrincipalDashboardScreen()),
+      GoRoute(path: AppRoutes.principalStaff, builder: (_, __) => const PrincipalStaffScreen()),
+
+      // Registrar (work screens are still the original Admin screens)
+      GoRoute(path: AppRoutes.registrarDashboard, builder: (_, __) => const RegistrarDashboardScreen()),
+      GoRoute(path: AppRoutes.registrarStructure, builder: (_, __) => const AdminStructureScreen()),
+      GoRoute(path: AppRoutes.registrarTutors, builder: (_, __) => const AdminTutorsScreen()),
+      GoRoute(path: AppRoutes.registrarStudents, builder: (_, __) => const AdminStudentsScreen()),
+      GoRoute(path: AppRoutes.registrarContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
+
+      // Bursar
+      GoRoute(path: AppRoutes.bursarDashboard, builder: (_, __) => const BursarDashboardScreen()),
 
       // Tutor
       GoRoute(path: AppRoutes.tutorRegister, builder: (_, __) => const TutorRegisterScreen()),
@@ -121,6 +131,21 @@ GoRouter buildAppRouter({
   );
 }
 
+/// Where a signed-in staff member lands after login.
+String _staffHome(UserRole role) {
+  switch (role) {
+    case UserRole.principal:
+      return AppRoutes.principalDashboard;
+    case UserRole.registrar:
+      return AppRoutes.registrarDashboard;
+    case UserRole.bursar:
+      return AppRoutes.bursarDashboard;
+    case UserRole.tutor:
+    case UserRole.student:
+      return AppRoutes.staffLogin;
+  }
+}
+
 String? _guard(
   BuildContext context,
   GoRouterState state,
@@ -130,16 +155,17 @@ String? _guard(
   final path = state.matchedLocation;
 
   final isEntryRoute = path == AppRoutes.welcome || path == AppRoutes.roleSelect;
-  final isAdminRoute = path.startsWith('/admin');
+  final isStaffLogin = path == AppRoutes.staffLogin;
+  final isPrincipalRoute = path.startsWith('/principal');
+  final isRegistrarRoute = path.startsWith('/registrar');
+  final isBursarRoute = path.startsWith('/bursar');
   final isTutorRoute = path.startsWith('/tutor');
   final isStudentRoute = path.startsWith('/student');
 
   // Public routes within each section that must stay reachable even
-  // WITHOUT an active session — otherwise nobody could ever sign in or
-  // register in the first place. Everything else in that section
-  // requires the corresponding active session.
-  final isAdminPublicRoute =
-      path == AppRoutes.adminSetup || path == AppRoutes.adminLogin;
+  // WITHOUT an active session, otherwise nobody could ever sign in or
+  // register. Everything else in that section requires the matching
+  // active session.
   final isTutorPublicRoute =
       path == AppRoutes.tutorRegister || path == AppRoutes.tutorLogin;
   final isStudentPublicRoute = path == AppRoutes.studentSearch;
@@ -147,8 +173,8 @@ String? _guard(
   if (isEntryRoute) {
     if (auth.isResolving) return null;
 
-    if (auth.resolvedRole == UserRole.admin) {
-      return AppRoutes.adminDashboard;
+    if (auth.resolvedRole != null && auth.resolvedRole!.isStaff) {
+      return _staffHome(auth.resolvedRole!);
     }
 
     if (auth.resolvedRole == UserRole.tutor) {
@@ -160,25 +186,34 @@ String? _guard(
   }
 
   // ---------------------------------------------------------------
-  // ADMIN routes
+  // STAFF login (shared by Principal, Registrar, Bursar)
   // ---------------------------------------------------------------
-  if (isAdminRoute) {
-    // Public routes (login, setup) — must stay reachable for
-    // unauthenticated users, but redirect authenticated Admins away
-    // so they don't get stuck on the login screen after signing in.
-    if (isAdminPublicRoute) {
-      if (auth.isResolving) return null;
-      if (auth.resolvedRole == UserRole.admin) {
-        return AppRoutes.adminDashboard;
-      }
-      return null;
-    }
-
+  if (isStaffLogin) {
     if (auth.isResolving) return null;
+    if (auth.isUsableStaffSession) return _staffHome(auth.resolvedRole!);
+    return null;
+  }
 
-    if (auth.resolvedRole != UserRole.admin) {
-      return AppRoutes.adminLogin;
-    }
+  // ---------------------------------------------------------------
+  // PRINCIPAL / REGISTRAR / BURSAR routes
+  // ---------------------------------------------------------------
+  if (isPrincipalRoute || isRegistrarRoute || isBursarRoute) {
+    if (auth.isResolving) return null;
+    if (!auth.isUsableStaffSession) return AppRoutes.staffLogin;
+
+    final role = auth.resolvedRole!;
+    final allowed = isPrincipalRoute
+        ? role == UserRole.principal
+        : isBursarRoute
+            ? role == UserRole.bursar
+            // Registrar section: the Registrar, plus the Principal while
+            // the academic screens have no separate Principal view yet
+            // (Phase 2).
+            : role == UserRole.registrar || role == UserRole.principal;
+
+    // A signed-in staff member opening another role's section goes
+    // home rather than to the login screen.
+    if (!allowed) return _staffHome(role);
     return null;
   }
 
@@ -186,9 +221,9 @@ String? _guard(
   // TUTOR routes
   // ---------------------------------------------------------------
   if (isTutorRoute) {
-    // Public routes (login, register) — must stay reachable for
-    // unauthenticated users, but redirect authenticated Tutors away
-    // so they don't get stuck on the login screen after signing in.
+    // Public routes (login, register) must stay reachable for
+    // unauthenticated users, but redirect authenticated Tutors away so
+    // they don't get stuck on the login screen after signing in.
     if (isTutorPublicRoute) {
       if (auth.isResolving) return null;
       if (auth.resolvedRole == UserRole.tutor) {
@@ -219,31 +254,28 @@ String? _guard(
     if (isStudentPublicRoute) return null;
     if (path == AppRoutes.studentAccountInactive) return null;
     if (path == AppRoutes.studentSettings) {
-      // Settings must stay reachable even for an inactive session — this
+      // Settings must stay reachable even for an inactive session. This
       // is deliberate: it's where clearSession() lives (per the
       // borrowed-phone design), and a student whose session somehow
-      // became unusable still needs a way to clear it and start over,
-      // not get locked out of the one screen that could fix that.
+      // became unusable still needs a way to clear it and start over.
       return null;
     }
 
     // Still restoring a persisted session from shared_preferences on
-    // app startup — don't redirect yet, let the restoring state render
-    // its own loading UI. Redirecting here would cause a flash to
+    // app startup: don't redirect yet, or it would flash to
     // studentSearch before a valid persisted session finishes loading.
     if (student.isRestoring) return null;
 
     if (!student.isUsableSession) {
       // Covers both "never searched" and "found but suspended/
-      // terminated-course" — both cases correctly land back at NSIN
-      // entry, since neither has a usable session to proceed with.
+      // terminated-course": neither has a usable session to proceed with.
       return AppRoutes.studentSearch;
     }
 
     return null;
   }
 
-  return null; // unrecognized path — let GoRouter's own 404 handling apply
+  return null; // unrecognized path: let GoRouter's own 404 handling apply
 }
 
 /// Temporary placeholder widget so this router file is independently

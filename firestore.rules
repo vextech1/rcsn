@@ -7,12 +7,35 @@ service cloud.firestore {
     // Helper functions
     // -------------------------------------------------------------------
 
-    /// True if the requesting user is the single Admin account.
-    /// Checks that the user is authenticated AND a document exists in
-    /// the `admins` collection with their UID as the document ID.
-    function isAdmin() {
+    /// True if the caller has a `staff` document whose status is 'active'.
+    /// Status is read live on every request, so suspending a staff member
+    /// takes effect immediately (the `role` custom claim is only a routing
+    /// hint for the app and is never trusted here).
+    function isStaff() {
       return request.auth != null
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid))
+             .data.status == 'active';
+    }
+
+    /// True if the caller is an active staff member with the given role
+    /// ('principal' | 'registrar' | 'bursar').
+    function isStaffRole(role) {
+      return isStaff()
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid))
+             .data.role == role;
+    }
+
+    function isPrincipal() { return isStaffRole('principal'); }
+    function isRegistrar() { return isStaffRole('registrar'); }
+    function isBursar()    { return isStaffRole('bursar'); }
+
+    /// TRANSITIONAL (Phase 1). Stands in for the retired single Admin on
+    /// every academic collection below, so the existing management screens
+    /// keep working. Phase 2 narrows writes to isRegistrar() and leaves the
+    /// Principal with view plus status override.
+    function isAdmin() {
+      return isPrincipal() || isRegistrar();
     }
 
     /// True if the requesting user has an active Tutor account.
@@ -35,27 +58,34 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
-    // admins — exactly one Admin account (Section 2.1)
+    // staff — Principal, Registrar, Bursar (replaces the single Admin)
+    // -------------------------------------------------------------------
+    //
+    // Doc ID = Firebase Auth uid. Fields: name, email, role, status,
+    // createdAt, createdBy. There is NO client write path: staff accounts
+    // are created and suspended only by the createStaff / setStaffStatus
+    // Cloud Functions (Admin SDK), and the first Principal is created by
+    // functions/scripts/bootstrap-principal.js. That closes the class of
+    // bug where any signed-in user could write their own role document.
+
+    match /staff/{staffId} {
+      // A staff member reads their own record (role resolution at login,
+      // including when suspended, so the app can explain why). The
+      // Principal reads any record and lists all staff.
+      allow get: if request.auth != null
+        && (request.auth.uid == staffId || isPrincipal());
+      allow list: if isPrincipal();
+
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------
+    // admins — RETIRED. Replaced by `staff`. Locked entirely; the legacy
+    // document is migrated by bootstrap-principal.js --from-admin.
     // -------------------------------------------------------------------
 
     match /admins/{adminId} {
-      // Anyone authenticated can check whether an admin exists
-      // (RoleSelectScreen calls AdminRepository.adminExists()).
-      allow read: if request.auth != null;
-
-      // Create: DISABLED (Phase 0 hotfix). The previous rule only checked
-      // that the caller's own doc did not exist, which is true for every
-      // new user, so any signed-in user could make themselves admin.
-      // The Principal is created by a local Admin SDK bootstrap script
-      // (Phase 1); there is no client-side creation path.
-      allow create: if false;
-
-      // Update: only the admin themselves can update their own doc.
-      allow update: if isAdmin() && request.auth.uid == adminId;
-
-      // Delete: admin only — protect against accidental or malicious
-      // deletion of the sole admin account.
-      allow delete: if isAdmin();
+      allow read, write: if false;
     }
 
     // -------------------------------------------------------------------

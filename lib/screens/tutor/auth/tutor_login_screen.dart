@@ -9,7 +9,7 @@ import '../../../widgets/forms/app_text_field.dart';
 /// Tutor login. Shares [AuthProvider.signIn] with Admin login (once that
 /// screen exists) — the same method per Section 2.4's permission table
 /// showing both roles use email+password, and role resolution after
-/// sign-in is AuthProvider's job (checking AdminRepository then
+/// sign-in is AuthProvider's job (checking StaffRepository then
 /// TutorRepository), not something this screen decides.
 class TutorLoginScreen extends StatefulWidget {
   const TutorLoginScreen({super.key});

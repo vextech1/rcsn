@@ -1,4 +1,6 @@
 const functions = require('firebase-functions');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const crypto = require('crypto');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -228,3 +230,134 @@ exports.onContentUploaded = functions.firestore
 
     return null;
   });
+
+// ---------------------------------------------------------------------------
+// Staff management (Principal only)
+//
+// Staff accounts (registrar, bursar) cannot be created from the client:
+// creating an Auth user in the app signs the creator out, and a client write
+// path to the `staff` collection would be a privilege-escalation hole. These
+// callables use the Admin SDK instead. The caller's authority is re-checked
+// against Firestore on every call (not the token claim), so a suspended
+// Principal loses access immediately.
+//
+// The new account gets a random password nobody knows. The app then calls
+// sendPasswordResetEmail so the new staff member sets their own.
+// ---------------------------------------------------------------------------
+
+const CREATABLE_STAFF_ROLES = ['registrar', 'bursar'];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function requireActivePrincipal(request) {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Please sign in.');
+  }
+  const snap = await db.collection('staff').doc(request.auth.uid).get();
+  if (
+    !snap.exists ||
+    snap.get('role') !== 'principal' ||
+    snap.get('status') !== 'active'
+  ) {
+    throw new HttpsError('permission-denied', 'Only the Principal can do this.');
+  }
+  return request.auth.uid;
+}
+
+exports.createStaff = onCall(async (request) => {
+  const callerUid = await requireActivePrincipal(request);
+
+  const data = request.data || {};
+  const name = typeof data.name === 'string' ? data.name.trim() : '';
+  const email =
+    typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+  const role = data.role;
+
+  if (name.length < 2 || name.length > 100) {
+    throw new HttpsError('invalid-argument', 'Enter the staff member\'s full name.');
+  }
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new HttpsError('invalid-argument', 'Enter a valid email address.');
+  }
+  if (!CREATABLE_STAFF_ROLES.includes(role)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Role must be registrar or bursar. There is exactly one Principal.'
+    );
+  }
+
+  let user;
+  try {
+    user = await admin.auth().createUser({
+      email,
+      displayName: name,
+      password: crypto.randomBytes(24).toString('base64url'),
+    });
+  } catch (e) {
+    if (e.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'An account with that email already exists.');
+    }
+    if (e.code === 'auth/invalid-email') {
+      throw new HttpsError('invalid-argument', 'Enter a valid email address.');
+    }
+    console.error('createStaff: createUser failed', e);
+    throw new HttpsError('internal', 'Could not create the account.');
+  }
+
+  try {
+    await admin.auth().setCustomUserClaims(user.uid, { role });
+    await db.collection('staff').doc(user.uid).set({
+      name,
+      email,
+      role,
+      status: 'active',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: callerUid,
+    });
+  } catch (e) {
+    // Do not leave an Auth user with no staff record behind.
+    console.error('createStaff: record write failed, rolling back', e);
+    await admin.auth().deleteUser(user.uid).catch(() => {});
+    throw new HttpsError('internal', 'Could not create the account.');
+  }
+
+  return { staffId: user.uid };
+});
+
+exports.setStaffStatus = onCall(async (request) => {
+  const callerUid = await requireActivePrincipal(request);
+
+  const data = request.data || {};
+  const staffId = typeof data.staffId === 'string' ? data.staffId : '';
+  const status = data.status;
+
+  if (!staffId || !['active', 'suspended'].includes(status)) {
+    throw new HttpsError('invalid-argument', 'staffId and a valid status are required.');
+  }
+  if (staffId === callerUid) {
+    throw new HttpsError('failed-precondition', 'You cannot change your own status.');
+  }
+
+  const ref = db.collection('staff').doc(staffId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError('not-found', 'Staff member not found.');
+  }
+  if (snap.get('role') === 'principal') {
+    throw new HttpsError('permission-denied', 'The Principal account cannot be changed.');
+  }
+
+  await ref.update({
+    status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: callerUid,
+  });
+
+  // Also disable the Auth user and drop live sessions, so a suspension does
+  // not wait for the staff member's current token to expire.
+  await admin.auth().updateUser(staffId, { disabled: status === 'suspended' });
+  if (status === 'suspended') {
+    await admin.auth().revokeRefreshTokens(staffId);
+  }
+
+  return { ok: true };
+});

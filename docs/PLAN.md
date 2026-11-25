@@ -67,22 +67,22 @@ The single Admin is replaced by three staff roles, plus Tutor and Student.
 
 - [ ] Check the `admins` collection and the Auth users list in the Firebase console for entries you do not recognise.
 - [ ] Check which Firestore and Storage rules are actually deployed.
-- [ ] Deploy `allow create: if false` on `admins` (assumes the existing admin account already exists; verify first). This closes finding 1 without waiting for the restructure.
+- [x] Lock `admins` (superseded by retiring it in Phase 1; rules written, **not yet deployed**) (assumes the existing admin account already exists; verify first). This closes finding 1 without waiting for the restructure.
 - [ ] Restrict the Android API key to the package name and SHA-1 in Google Cloud.
 - [ ] Decide whether the GitHub repo should be private (it is currently public and contains `firestore.rules`).
-- [ ] Add `.firebaserc` and `firestore.indexes.json` (`content_items`: `subjectId` asc, `isArchived` asc, `uploadedAt` desc).
-- [ ] Set up the Firebase Emulator Suite and a rules test suite. Every rule change is tested as: signed-out, student, active tutor, suspended tutor, unassigned tutor, each staff role.
+- [x] Add `.firebaserc` and `firestore.indexes.json` (`content_items`: `subjectId` asc, `isArchived` asc, `uploadedAt` desc).
+- [x] Set up the Firebase Emulator Suite and a rules test suite (`rules-tests/`, runs in CI). Every rule change is tested as: signed-out, student, active tutor, suspended tutor, unassigned tutor, each staff role. Phase 1 covers the staff roles and `staff`/`admins`; the tutor and student cases arrive with Phases 4 and 5.
 
 ### Phase 1: Principal and staff foundation
 
-- [ ] `staff` collection, rules and `isStaff(role)` helpers.
-- [ ] Callable `createStaff` (Principal only) and `setStaffStatus`.
-- [ ] Bootstrap script that creates the Principal.
-- [ ] Migrate the existing admin account into a Principal `staff` record, then retire `admins`.
-- [ ] Public `app_config/setup` flag if any pre-login "is the system set up" check is still needed.
-- [ ] Split `UserRole`; rewrite `AuthProvider` role resolution to read `staff`; update the router guard.
-- [ ] Staff login screen with role-based redirect.
-- [ ] Principal dashboard with staff management (create, suspend, reactivate).
+- [x] `staff` collection, rules and `isStaff(role)` helpers.
+- [x] Callable `createStaff` (Principal only) and `setStaffStatus`.
+- [x] Bootstrap script that creates the Principal.
+- [x] Migrate the existing admin account into a Principal `staff` record, then retire `admins` (script written: `--from-admin`; **run it before deploying the rules**, see `docs/PHASE1.md`).
+- [x] Public `app_config/setup` flag: not needed. Role select no longer does a pre-login check.
+- [x] Split `UserRole`; rewrite `AuthProvider` role resolution to read `staff`; update the router guard.
+- [x] Staff login screen with role-based redirect.
+- [x] Principal dashboard with staff management (create, suspend, reactivate).
 
 ### Phase 2: Registrar
 

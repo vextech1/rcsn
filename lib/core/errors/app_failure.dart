@@ -25,7 +25,7 @@ class InvalidCredentialsFailure extends AuthFailure {
 
 class AccountSuspendedFailure extends AuthFailure {
   const AccountSuspendedFailure()
-      : super('This account has been suspended. Please contact the Admin.');
+      : super('This account has been suspended. Please contact the Principal or Registrar.');
 }
 
 class AccountTerminatedFailure extends AuthFailure {
@@ -33,10 +33,11 @@ class AccountTerminatedFailure extends AuthFailure {
       : super('This account has been terminated.');
 }
 
-class AdminAlreadyExistsFailure extends AppFailure {
-  const AdminAlreadyExistsFailure()
-      : super('An Admin account already exists. Please log in instead.');
+/// A staff-management action (create, suspend, reactivate, invite) failed.
+class StaffManagementFailure extends AppFailure {
+  const StaffManagementFailure(super.message);
 }
+
 // ---------------------------------------------------------------------
 // Student NSIN lookup failures — Section 2.3
 // ---------------------------------------------------------------------

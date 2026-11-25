@@ -1,29 +1,40 @@
-/// The three user roles in the RCSN Mobile App.
+/// The five roles in the RCSN Mobile App.
 ///
-/// Per the project document (Section 2), each role has a distinct entry
-/// method into the app and is never inferred from context — a screen or
-/// provider should always know explicitly which role it's serving.
+/// Each role has a distinct entry method and is never inferred from
+/// context: a screen or provider should always know explicitly which role
+/// it is serving.
 enum UserRole {
-  /// Exactly one Admin account exists, created once via first-run setup.
-  /// Builds academic structure, assigns tutors, manages account status.
-  /// See Section 2.1.
-  admin,
+  /// The one school Principal. Creates and suspends staff accounts and has
+  /// oversight of everything else. Created by the bootstrap script, never
+  /// in-app.
+  principal,
+
+  /// Academic registrar / DOS. Builds academic structure, assigns tutors,
+  /// admits students and manages academic status. Created by the Principal.
+  registrar,
+
+  /// Bursar. Records fee payments and balances. Created by the Principal.
+  bursar,
 
   /// Self-registers (name, email, password). Has no subject access until
-  /// assigned by Admin — cannot self-assign. See Section 2.2.
+  /// assigned by the Registrar and cannot self-assign.
   tutor,
 
-  /// No registration, no password. Pre-registered at admission by Admin;
-  /// enters the app via NSIN lookup only. See Section 2.3.
+  /// No registration, no password. Pre-registered at admission; enters the
+  /// app by NSIN only.
   student,
 }
 
-/// Human-readable label for UI display (role-select screen, admin lists).
-extension UserRoleLabel on UserRole {
+extension UserRoleInfo on UserRole {
+  /// Human-readable label for UI display.
   String get label {
     switch (this) {
-      case UserRole.admin:
-        return 'Admin';
+      case UserRole.principal:
+        return 'Principal';
+      case UserRole.registrar:
+        return 'Registrar';
+      case UserRole.bursar:
+        return 'Bursar';
       case UserRole.tutor:
         return 'Tutor';
       case UserRole.student:
@@ -31,13 +42,21 @@ extension UserRoleLabel on UserRole {
     }
   }
 
-  /// Firestore collection name where this role's account records live.
-  /// Kept here — not re-typed as a string literal in repositories — so a
-  /// rename only ever happens in one place.
+  /// True for the three roles that live in the shared `staff` collection
+  /// and sign in through the staff login.
+  bool get isStaff =>
+      this == UserRole.principal ||
+      this == UserRole.registrar ||
+      this == UserRole.bursar;
+
+  /// Firestore collection where this role's account records live. Kept
+  /// here so a rename only ever happens in one place.
   String get collectionName {
     switch (this) {
-      case UserRole.admin:
-        return 'admins';
+      case UserRole.principal:
+      case UserRole.registrar:
+      case UserRole.bursar:
+        return 'staff';
       case UserRole.tutor:
         return 'tutors';
       case UserRole.student:

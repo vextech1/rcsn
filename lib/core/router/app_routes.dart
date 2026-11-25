@@ -11,14 +11,25 @@ class AppRoutes {
   static const String welcome = '/';
   static const String roleSelect = '/role-select';
 
-  // Admin
-  static const String adminSetup = '/admin/setup';
-  static const String adminLogin = '/admin/login';
-  static const String adminDashboard = '/admin/dashboard';
-  static const String adminStructure = '/admin/structure';
-  static const String adminTutors = '/admin/tutors';
-  static const String adminStudents = '/admin/students';
-  static const String adminContentTypes = '/admin/content-types';
+  // Staff (Principal, Registrar, Bursar share one login)
+  static const String staffLogin = '/staff/login';
+
+  // Principal
+  static const String principalDashboard = '/principal/dashboard';
+  static const String principalStaff = '/principal/staff';
+
+  // Registrar. The structure/tutors/students/content-types screens are
+  // still the original Admin screens, relocated here in Phase 1 and
+  // rebuilt for the Registrar in Phase 2. The Principal can also open
+  // them for now (see the guard in app_router.dart).
+  static const String registrarDashboard = '/registrar/dashboard';
+  static const String registrarStructure = '/registrar/structure';
+  static const String registrarTutors = '/registrar/tutors';
+  static const String registrarStudents = '/registrar/students';
+  static const String registrarContentTypes = '/registrar/content-types';
+
+  // Bursar
+  static const String bursarDashboard = '/bursar/dashboard';
 
   // Tutor
   static const String tutorRegister = '/tutor/register';
