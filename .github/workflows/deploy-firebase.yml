@@ -35,11 +35,32 @@ jobs:
           python3 -c "import json,os;d=json.load(open(os.environ['GOOGLE_APPLICATION_CREDENTIALS']));print('credentials for project', d.get('project_id'))"
 
       - name: Deploy Firestore rules and indexes
-        run: npx -y firebase-tools deploy --only firestore:rules,firestore:indexes --project school-msa --non-interactive
+        shell: bash
+        run: |
+          set -o pipefail
+          npx -y firebase-tools deploy --only firestore:rules,firestore:indexes --project school-msa --non-interactive 2>&1 | tee deploy-firestore.log
+
+      - name: Surface Firestore deploy errors
+        if: failure()
+        shell: bash
+        run: |
+          msg=$(tail -40 deploy-firestore.log | python3 -c "import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read()[:6000],safe=' /:.,;()[]{}<>=-_'))")
+          echo "::error title=FIRESTORE-DEPLOY::${msg}"
 
       - name: Deploy Storage rules
+        id: storage
         continue-on-error: true
-        run: npx -y firebase-tools deploy --only storage --project school-msa --non-interactive
+        shell: bash
+        run: |
+          set -o pipefail
+          npx -y firebase-tools deploy --only storage --project school-msa --non-interactive 2>&1 | tee deploy-storage.log
+
+      - name: Surface Storage deploy errors
+        if: steps.storage.outcome == 'failure'
+        shell: bash
+        run: |
+          msg=$(tail -40 deploy-storage.log | python3 -c "import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read()[:6000],safe=' /:.,;()[]{}<>=-_'))")
+          echo "::warning title=STORAGE-DEPLOY::${msg}"
 
       - name: Remove credentials
         if: always()
