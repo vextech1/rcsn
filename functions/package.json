@@ -1,0 +1,13 @@
+{
+  "name": "rcsn-functions",
+  "description": "Cloud Functions for RCSN Mobile App — push notifications on new content uploads",
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "private": true
+}

@@ -1,0 +1,77 @@
+name: rcsn_mobile_app
+description: "RCSN Mobile App — school management app connecting tutors and students at Rakai Community School of Nursing."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- Firebase (per Section 6.1 of the project document) ---
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1       # Admin + Tutor login
+  cloud_firestore: ^5.4.4     # real-time structure, assignments, content sync
+  firebase_storage: ^12.3.4   # file uploads, 100MB cap enforced in upload service
+  firebase_messaging: ^15.1.3 # push notification on new tutor upload
+
+  # --- State management (Section 6.2 — Provider chosen over Riverpod) ---
+  provider: ^6.1.2
+
+  # --- Routing ---
+  go_router: ^14.6.1
+
+  # --- File handling / uploads ---
+  file_picker: ^8.1.3         # tutor file selection (image/pdf/excel/word/video)
+  video_compress: ^3.1.3      # client-side video compression before upload — required per Section 4.1, not optional
+  path_provider: ^2.1.4       # local paths for offline-downloaded files
+  open_filex: ^4.6.0          # opening downloaded files in their native viewer
+
+  # --- Local persistence (offline download tracking, Section 2.3) ---
+  shared_preferences: ^2.3.3
+  sqflite: ^2.4.1              # local index of downloaded files for offline viewing
+
+  # --- UI / utility ---
+  cupertino_icons: ^1.0.8
+  intl: ^0.19.0
+  cached_network_image: ^3.4.1
+  percent_indicator: ^4.2.3    # upload progress UI, flagged as required in Section 4.1
+  connectivity_plus: ^6.1.0    # detect weak/no connection before large uploads
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.11.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  # Font files (Roboto-Regular/Medium/Bold.ttf) need to be added manually
+  # under assets/fonts/ — see core/theme/app_typography.dart's
+  # kAppFontFamily doc comment. Three weights, not two: AppTypography
+  # uses FontWeight.normal, w600, AND bold across its styles — without a
+  # real Medium (500) file, Flutter fakes w600 by synthetically
+  # "bolding" Regular, a visible quality difference from actual
+  # Medium-weight glyphs.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: assets/icons/app_icon.png
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: assets/icons/app_icon.png

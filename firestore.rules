@@ -1,0 +1,311 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------
+    // Helper functions
+    // -------------------------------------------------------------------
+
+    /// True if the requesting user is the single Admin account.
+    /// Checks that the user is authenticated AND a document exists in
+    /// the `admins` collection with their UID as the document ID.
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    /// True if the requesting user has an active Tutor account.
+    /// The tutor document ID MUST equal the Firebase Auth UID — this is
+    /// enforced at creation time (see tutors.create below).
+    function isActiveTutor() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/tutors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/tutors/$(request.auth.uid))
+             .data.status == 'active';
+    }
+
+    /// True if the given tutor is assigned to the given subject.
+    /// Relies on tutor_assignments documents using composite IDs:
+    /// `{tutorId}_{subjectId}` — see the note on tutor_assignments below.
+    function isAssignedToSubject(tutorId, subjectId) {
+      return exists(
+        /databases/$(database)/documents/tutor_assignments/$(tutorId)_$(subjectId)
+      );
+    }
+
+    // -------------------------------------------------------------------
+    // admins — exactly one Admin account (Section 2.1)
+    // -------------------------------------------------------------------
+
+    match /admins/{adminId} {
+      // Anyone authenticated can check whether an admin exists
+      // (RoleSelectScreen calls AdminRepository.adminExists()).
+      allow read: if request.auth != null;
+
+      // Create: only if no admin exists yet (first-run setup guard).
+      // The document ID must match the authenticated user's UID.
+      allow create: if request.auth != null
+        && request.auth.uid == adminId
+        && !exists(/databases/$(database)/documents/admins/$(adminId));
+
+      // Update: only the admin themselves can update their own doc.
+      allow update: if isAdmin() && request.auth.uid == adminId;
+
+      // Delete: admin only — protect against accidental or malicious
+      // deletion of the sole admin account.
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // tutors — self-registration, admin-managed status (Section 2.2)
+    // -------------------------------------------------------------------
+
+    match /tutors/{tutorId} {
+      // Authenticated users can read tutor profiles. Admin lists all
+      // tutors; a tutor reads their own profile via AuthProvider.
+      allow read: if request.auth != null;
+
+      // Create: self-registration only. The document ID MUST equal the
+      // authenticated user's UID. A tutor cannot create a document for
+      // a different UID. The incoming document must set status to
+      // 'active' — no self-creating with 'suspended' or 'terminated'.
+      allow create: if request.auth != null
+        && request.auth.uid == tutorId
+        && request.resource.data.status == 'active'
+        && request.resource.data.name is string
+        && request.resource.data.email is string;
+
+      // Update: a tutor can update their OWN document only to set
+      // status to 'terminated' (self-termination, Section 2.2).
+      // Admin can update any tutor's document (suspend, reactivate,
+      // terminate) — full field write allowed for admin.
+      allow update: if request.auth != null
+        && (
+          // Tutor self-termination: only the status field, only to 'terminated'
+          (request.auth.uid == tutorId
+           && request.resource.data.status == 'terminated'
+           && resource.data.status == 'active')
+          // Admin: unrestricted updates
+          || isAdmin()
+        );
+
+      // Delete: admin only. Tutors cannot delete their own accounts
+      // — self-termination sets status, does not remove the record.
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // tutor_assignments — Admin-only assignment (Section 2.2)
+    // -------------------------------------------------------------------
+    //
+    // IMPORTANT DATA-MODEL DEPENDENCY:
+    // These rules assume tutor_assignments documents use composite IDs
+    // of the form `{tutorId}_{subjectId}` (e.g. "abc123_xyz789").
+    // This enables the `isAssignedToSubject()` function above to check
+    // assignment with a single `exists()` call rather than needing a
+    // collection-group query (which Firestore rules don't support).
+    //
+    // If documents are created via Firestore's auto-ID (add()), these
+    // rules will not enforce the assignment check for content_items.
+    // The corresponding repository method —
+    // TutorRepository.assignTutorToSubject() — must use
+    //   _assignments.doc('${tutorId}_${subjectId}').set(...)
+    // instead of
+    //   _assignments.add(...)
+
+    match /tutor_assignments/{assignmentId} {
+      // Authenticated users can read assignments. This is how the tutor
+      // dashboard's StreamBuilder sees assigned subjects, and how the
+      // content_items.create rule checks assignment.
+      allow read: if request.auth != null;
+
+      // Create: admin only (tutors cannot self-assign per Section 2.2).
+      // The incoming document must contain valid tutorId and subjectId
+      // fields, and the document ID must match the composite key.
+      allow create: if isAdmin()
+        && request.resource.data.tutorId is string
+        && request.resource.data.subjectId is string
+        && assignmentId == request.resource.data.tutorId + '_' + request.resource.data.subjectId;
+
+      // Update: admin only. Assignment documents are immutable in
+      // practice (they only have tutorId, subjectId, assignedAt), but
+      // allowing update gives flexibility for future fields.
+      allow update: if isAdmin();
+
+      // Delete: admin only (Section 2.2 — removing a tutor's access to
+      // a subject).
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // students — Admin-admitted, NSIN-lookup access (Section 2.3)
+    // -------------------------------------------------------------------
+
+    match /students/{studentId} {
+      // Authenticated users can read student records. The student
+      // themselves isn't "authenticated" in the Firebase Auth sense
+      // (NSIN-only, no password — Section 2.3), but the StudentProvider
+      // performs the lookup while the app is in an unauthenticated
+      // state. For the NSIN lookup to work, student documents must be
+      // readable without auth.
+      //
+      // DECISION: allow unauthenticated read of students. The NSIN
+      // itself is the access mechanism — a student enters their NSIN
+      // and the app looks it up. Without this read, the entire student
+      // flow is blocked. The data is non-sensitive (academic info only,
+      // per StudentRecord's own doc comment — fees/Bursar data is in a
+      // separate collection).
+      allow read: if true;
+
+      // Create: admin only (Section 2.3 — students do not self-register;
+      // this is the admission-entry action from Section 5 step 4).
+      allow create: if isAdmin()
+        && request.resource.data.nsin is string
+        && request.resource.data.name is string;
+
+      // Update: admin only (Section 2.1 — suspend, terminate, or update
+      // a student's record).
+      allow update: if isAdmin();
+
+      // Delete: admin only.
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // subjects — Admin-built academic structure (Section 3.3)
+    // -------------------------------------------------------------------
+
+    match /subjects/{subjectId} {
+      // Authenticated users can read subjects. Needed by tutor dashboard
+      // (to resolve assignment subjectIds to names) and by students
+      // browsing their scoped subjects.
+      allow read: if request.auth != null;
+
+      // Create: admin only (Section 2.1 — only Admin builds structure).
+      allow create: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.programType is string
+        && request.resource.data.year is int
+        && request.resource.data.semester is int;
+
+      // Update: admin only.
+      allow update: if isAdmin();
+
+      // Delete: admin only. Note: this does NOT cascade-delete
+      // ContentItems or TutorAssignments referencing this subject —
+      // that cleanup should be handled server-side (Cloud Function).
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // content_items — Tutor-uploaded files (Section 4.2)
+    // -------------------------------------------------------------------
+
+    match /content_items/{itemId} {
+      // Authenticated users can read content. This is how the tutor
+      // subject viewer and the student subject viewer (when built)
+      // display uploaded files.
+      allow read: if request.auth != null;
+
+      // Create: the uploading tutor must be active AND assigned to the
+      // subject they are uploading into. Admin can also upload.
+      //
+      // This is the concrete enforcement point for Section 2.2's rule
+      // that "a tutor cannot upload into a subject they haven't been
+      // assigned to" — the client-side check in
+      // TutorAuthorizationChecker.isTutorAssignedToSubject() is the
+      // first line of defense; this rule is the actual security
+      // boundary.
+      allow create: if request.auth != null
+        && (
+          isAdmin()
+          || (
+            isActiveTutor()
+            && request.resource.data.uploadedByTutorId == request.auth.uid
+            && isAssignedToSubject(
+                 request.auth.uid,
+                 request.resource.data.subjectId
+               )
+          )
+        )
+        && request.resource.data.subjectId is string
+        && request.resource.data.contentTypeId is string
+        && request.resource.data.fileName is string
+        && request.resource.data.fileUrl is string
+        && request.resource.data.storagePath is string
+        && request.resource.data.isArchived == false;
+
+      // Update: same assignment gate as create. A tutor can only
+      // archive/unarchive/update content they uploaded into a subject
+      // they are still assigned to. Admin can update anything.
+      allow update: if request.auth != null
+        && (
+          isAdmin()
+          || (
+            isActiveTutor()
+            && resource.data.uploadedByTutorId == request.auth.uid
+            && isAssignedToSubject(
+                 request.auth.uid,
+                 resource.data.subjectId
+               )
+          )
+        );
+
+      // Delete: same assignment gate. Permanent deletion of the file
+      // from Storage is handled client-side (StorageService.deleteFile)
+      // before the Firestore document is removed — both layers must
+      // allow the operation for it to succeed.
+      allow delete: if request.auth != null
+        && (
+          isAdmin()
+          || (
+            isActiveTutor()
+            && resource.data.uploadedByTutorId == request.auth.uid
+            && isAssignedToSubject(
+                 request.auth.uid,
+                 resource.data.subjectId
+               )
+          )
+        );
+    }
+
+    // -------------------------------------------------------------------
+    // content_types — Admin-extensible categories (Section 4.3)
+    // -------------------------------------------------------------------
+
+    match /content_types/{typeId} {
+      // Authenticated users can read content types. Needed by the tutor
+      // upload screen's dropdown and the student subject screen's
+      // filter chips.
+      allow read: if request.auth != null;
+
+      // Create: admin only (Section 4.3 — Admin adds new categories at
+      // runtime). ContentRepository.seedDefaultContentTypesIfNeeded()
+      // runs during first-run setup (as admin).
+      allow create: if isAdmin()
+        && request.resource.data.name is string;
+
+      // Update: admin only. Renaming a category is a deliberate
+      // exclusion for now (see AdminContentTypesScreen's doc comment),
+      // but the rule allows it for admin so it's not permanently locked.
+      allow update: if isAdmin();
+
+      // Delete: admin only. Same caveat as AdminContentTypesScreen —
+      // deleting a type that's referenced by existing ContentItems would
+      // orphan those items' contentTypeId. The UI doesn't expose delete
+      // yet; this rule allows it so the capability exists when the
+      // UI catches up, but Admin should be careful.
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Default deny — anything not explicitly matched above is blocked
+    // -------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+  }
+}

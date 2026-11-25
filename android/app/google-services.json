@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "495290949103",
+    "project_id": "rcsn-765ff",
+    "storage_bucket": "rcsn-765ff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:495290949103:android:f5b6927579ceaf7add6a1a",
+        "android_client_info": {
+          "package_name": "com.andrew.rcsn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEX9jeKZ4gvaO6D14BXpgKI9LgTHG_aoE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
