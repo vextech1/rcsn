@@ -17,13 +17,16 @@ the old `admins` collection.
      Or for a fresh account: `--name "Full Name" --email you@example.com`.
      It refuses to run if a Principal already exists, and seeds the default content
      types if there are none. Delete the key afterwards.
-2. **Deploy the rules and indexes.** `firebase deploy --only firestore:rules,firestore:indexes`
-   (do not run a bare `firebase deploy`).
+2. **Rules deploy automatically.** `.github/workflows/deploy-firebase.yml` deploys the
+   Firestore rules, indexes and Storage rules to `school-msa` whenever CI passes on `main`
+   (it needs the `FIREBASE_SERVICE_ACCOUNT` secret). Manual fallback:
+   `firebase deploy --only firestore:rules,firestore:indexes --project school-msa`
+   (never a bare `firebase deploy`).
 3. **Install the new app build** and sign in through Role Select, then Staff. The
    Principal dashboard has a Staff tile to add a Registrar or Bursar, who each get an
    email to set their own password.
 
-If the rules go out before step 1, no data is lost; the app just can't resolve a
+The rules do not need the Principal to exist first on a fresh project. If they go out before step 1, no data is lost; the app just can't resolve a
 role until the Principal record exists.
 
 ## How suspension works without Cloud Functions
