@@ -1,4 +1,4 @@
-package com.example.rcsn
+package com.school.app
 
 import io.flutter.embedding.android.FlutterActivity
 
