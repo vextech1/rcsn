@@ -5,9 +5,10 @@ enum StaffStatus { active, suspended }
 
 /// A Principal, Registrar or Bursar account.
 ///
-/// Document ID = Firebase Auth uid. Records are written only by the
-/// createStaff / setStaffStatus Cloud Functions and the bootstrap script;
-/// the app only ever reads them (see the `staff` rules in firestore.rules).
+/// Document ID = Firebase Auth uid. The Principal's app creates Registrar
+/// and Bursar records and flips their status; the first Principal record is
+/// created out-of-band (tools/bootstrap-principal.js). What each caller may
+/// write is enforced by the `staff` rules in firestore.rules.
 class StaffAccount {
   final String id;
   final String name;

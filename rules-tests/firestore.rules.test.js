@@ -19,6 +19,7 @@ const {
   updateDoc,
   deleteDoc,
   collection,
+  serverTimestamp,
 } = require('firebase/firestore');
 
 let env;
@@ -68,6 +69,21 @@ beforeEach(async () => {
   });
 });
 
+const newStaff = (createdBy, role) => ({
+  name: 'New Person',
+  email: 'new.person@example.com',
+  role,
+  status: 'active',
+  createdAt: serverTimestamp(),
+  createdBy,
+});
+
+const statusChange = (updatedBy, status) => ({
+  status,
+  updatedAt: serverTimestamp(),
+  updatedBy,
+});
+
 const as = (uid) => env.authenticatedContext(uid).firestore();
 const anon = () => env.unauthenticatedContext().firestore();
 
@@ -102,15 +118,60 @@ describe('staff collection', () => {
     await assertSucceeds(getDocs(collection(as('principal1'), 'staff')));
   });
 
-  it('nobody can write staff from the client, including the principal', async () => {
-    await assertFails(setDoc(doc(as('principal1'), 'staff/new1'), { name: 'N', role: 'bursar', status: 'active' }));
-    await assertFails(updateDoc(doc(as('principal1'), 'staff/bursar1'), { status: 'suspended' }));
+  it('nobody can delete staff, including the principal', async () => {
     await assertFails(deleteDoc(doc(as('principal1'), 'staff/bursar1')));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'staff/registrar1')));
   });
 
   it('a new user cannot make themselves staff (the old admin-takeover bug)', async () => {
-    await assertFails(setDoc(doc(as('attacker'), 'staff/attacker'), { name: 'A', email: 'a@example.com', role: 'principal', status: 'active' }));
+    await assertFails(setDoc(doc(as('attacker'), 'staff/attacker'), newStaff('attacker', 'principal')));
+    await assertFails(setDoc(doc(as('attacker'), 'staff/attacker'), newStaff('attacker', 'registrar')));
     await assertFails(updateDoc(doc(as('registrar1'), 'staff/registrar1'), { role: 'principal' }));
+  });
+
+  it('only the principal can create staff, and only registrar or bursar', async () => {
+    await assertSucceeds(setDoc(doc(as('principal1'), 'staff/new1'), newStaff('principal1', 'registrar')));
+    await assertSucceeds(setDoc(doc(as('principal1'), 'staff/new2'), newStaff('principal1', 'bursar')));
+    await assertFails(setDoc(doc(as('principal1'), 'staff/new3'), newStaff('principal1', 'principal')));
+    await assertFails(setDoc(doc(as('registrar1'), 'staff/new4'), newStaff('registrar1', 'bursar')));
+    await assertFails(setDoc(doc(as('bursar1'), 'staff/new5'), newStaff('bursar1', 'registrar')));
+    await assertFails(setDoc(doc(as('tutor1'), 'staff/new6'), newStaff('tutor1', 'registrar')));
+    await assertFails(setDoc(doc(anon(), 'staff/new7'), newStaff('principal1', 'registrar')));
+  });
+
+  it('a created staff record must be well-formed', async () => {
+    const db = as('principal1');
+    await assertFails(setDoc(doc(db, 'staff/bad1'), { ...newStaff('principal1', 'registrar'), status: 'suspended' }));
+    await assertFails(setDoc(doc(db, 'staff/bad2'), { ...newStaff('principal1', 'registrar'), createdBy: 'someone-else' }));
+    await assertFails(setDoc(doc(db, 'staff/bad3'), { ...newStaff('principal1', 'registrar'), extra: true }));
+    await assertFails(setDoc(doc(db, 'staff/bad4'), { ...newStaff('principal1', 'registrar'), name: 'X' }));
+    await assertFails(setDoc(doc(db, 'staff/bad5'), { ...newStaff('principal1', 'registrar'), email: 'not-an-email' }));
+    await assertFails(setDoc(doc(db, 'staff/bad6'), { ...newStaff('principal1', 'registrar'), createdAt: new Date(0) }));
+  });
+
+  it('the principal cannot overwrite an existing staff record via create', async () => {
+    await assertFails(setDoc(doc(as('principal1'), 'staff/principal1'), newStaff('principal1', 'registrar')));
+  });
+
+  it('the principal can suspend and reactivate others', async () => {
+    const db = as('principal1');
+    await assertSucceeds(updateDoc(doc(db, 'staff/bursar1'), statusChange('principal1', 'suspended')));
+    await assertSucceeds(updateDoc(doc(db, 'staff/registrar2'), statusChange('principal1', 'active')));
+  });
+
+  it('the principal cannot change anything but status, nor themselves', async () => {
+    const db = as('principal1');
+    await assertFails(updateDoc(doc(db, 'staff/bursar1'), { ...statusChange('principal1', 'suspended'), role: 'principal' }));
+    await assertFails(updateDoc(doc(db, 'staff/bursar1'), { ...statusChange('principal1', 'suspended'), name: 'Renamed' }));
+    await assertFails(updateDoc(doc(db, 'staff/bursar1'), statusChange('someone-else', 'suspended')));
+    await assertFails(updateDoc(doc(db, 'staff/bursar1'), statusChange('principal1', 'deleted')));
+    await assertFails(updateDoc(doc(db, 'staff/principal1'), statusChange('principal1', 'suspended')));
+  });
+
+  it('other staff cannot change status, including un-suspending themselves', async () => {
+    await assertFails(updateDoc(doc(as('registrar1'), 'staff/bursar1'), statusChange('registrar1', 'suspended')));
+    await assertFails(updateDoc(doc(as('registrar2'), 'staff/registrar2'), statusChange('registrar2', 'active')));
+    await assertFails(updateDoc(doc(as('bursar1'), 'staff/bursar1'), statusChange('bursar1', 'suspended')));
   });
 });
 

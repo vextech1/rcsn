@@ -1,0 +1,8 @@
+{
+  "name": "rcsn-tools",
+  "private": true,
+  "description": "One-off admin scripts (run locally with the Admin SDK; work on the Spark plan)",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

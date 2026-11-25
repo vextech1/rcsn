@@ -11,9 +11,9 @@ import '../../../widgets/forms/app_text_field.dart';
 /// Staff management, Principal only: list staff, add a Registrar or
 /// Bursar, suspend or reactivate them, and re-send a set-password invite.
 ///
-/// All changes go through Cloud Functions (see StaffRepository); this
-/// screen never writes to Firestore directly. The route guard limits it to
-/// the Principal, and the functions re-check that server-side.
+/// All changes go through StaffRepository. The route guard limits this
+/// screen to the Principal, and the Firestore rules re-check that on every
+/// write (the project runs on Spark, so there are no Cloud Functions).
 class PrincipalStaffScreen extends StatefulWidget {
   const PrincipalStaffScreen({super.key});
 

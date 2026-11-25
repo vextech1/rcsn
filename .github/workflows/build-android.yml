@@ -7,7 +7,7 @@ on:
 
 jobs:
   backend:
-    name: functions syntax and rules tests
+    name: rules tests and script checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -22,14 +22,11 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Functions install and syntax check
+      - name: Script syntax check
         shell: bash
         run: |
-          set -o pipefail
-          cd functions
-          npm install --no-audit --no-fund 2>&1 | tee ../functions.log
-          node --check index.js
-          node --check scripts/bootstrap-principal.js
+          node --check functions/index.js
+          node --check tools/bootstrap-principal.js
 
       - name: Rules tests (Firestore emulator)
         shell: bash
@@ -42,7 +39,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          cat functions.log rules.log > ci.log 2>/dev/null || true
+          cat rules.log > ci.log 2>/dev/null || true
           .github/scripts/annotate-failure.sh RULES-LOG ci.log
 
   build:

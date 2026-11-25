@@ -64,12 +64,16 @@ service cloud.firestore {
     // staff — Principal, Registrar, Bursar (replaces the single Admin)
     // -------------------------------------------------------------------
     //
-    // Doc ID = Firebase Auth uid. Fields: name, email, role, status,
-    // createdAt, createdBy. There is NO client write path: staff accounts
-    // are created and suspended only by the createStaff / setStaffStatus
-    // Cloud Functions (Admin SDK), and the first Principal is created by
-    // functions/scripts/bootstrap-principal.js. That closes the class of
-    // bug where any signed-in user could write their own role document.
+    // Doc ID = Firebase Auth uid. Runs on the free Spark plan, so there are
+    // no Cloud Functions: the Principal's app writes these documents and
+    // these rules are the whole security boundary. The Principal can only
+    // ever create a registrar or bursar (never another principal), can only
+    // flip status on someone else, and nobody can delete staff. The first
+    // Principal is created out-of-band (tools/bootstrap-principal.js or by
+    // hand in the console), never from the app.
+    //
+    // Suspension is enforced here, live on every request (isStaff() reads
+    // status), and by the app signing a suspended user out.
 
     match /staff/{staffId} {
       // A staff member reads their own record (role resolution at login,
@@ -79,7 +83,33 @@ service cloud.firestore {
         && (request.auth.uid == staffId || isPrincipal());
       allow list: if isPrincipal();
 
-      allow create, update, delete: if false;
+      allow create: if isPrincipal()
+        && request.resource.data.keys().hasOnly(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasAll(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.matches('.+@.+[.].+')
+        && request.resource.data.role in ['registrar', 'bursar']
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      // Suspend / reactivate: Principal only, never themselves, never the
+      // Principal record, and only the status stamp fields may change.
+      allow update: if isPrincipal()
+        && staffId != request.auth.uid
+        && resource.data.role != 'principal'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updatedAt', 'updatedBy'])
+        && request.resource.data.status in ['active', 'suspended']
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
     }
 
     // -------------------------------------------------------------------

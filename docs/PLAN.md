@@ -61,6 +61,31 @@ The single Admin is replaced by three staff roles, plus Tutor and Student.
 
 ---
 
+## Spark plan constraints
+
+The project runs on the free Spark plan for now, so **no Cloud Functions** (they need
+Blaze). Everything below is designed around that:
+
+- **Staff management** is done by the Principal's app. The `staff` rules are the
+  boundary: Principal-only create (registrar or bursar), status-only updates, no
+  deletes. First Principal is created by hand or by `tools/bootstrap-principal.js`.
+- **Fee stubs (Phase 3)**: the admission screen writes the student and a zero-balance
+  `student_fees` stub in one batch (rules let the Registrar create only that stub),
+  instead of a Cloud Function trigger.
+- **Student access (Phase 5)**: no `studentLogin` function. Students are keyed by NSIN
+  (`students/{nsin}`): `get` is allowed, `list` is denied, so an NSIN can be checked but
+  not enumerated. The app signs in anonymously and writes `student_sessions/{uid}` with
+  the NSIN, and rules verify that against an active student before allowing reads.
+  App Check (free) and Firestore quotas are the only rate limiting.
+- **Push notifications**: `onContentUploaded` stays dormant (`functions/`). Until Blaze,
+  students see new content live in-app. FCM token storage can still be built now.
+- **Storage**: Cloud Storage on Spark has a small free allowance (about 5 GB stored,
+  1 GB/day downloads) and, for projects created after October 2024, may require Blaze
+  to enable at all. **Open item: check the console's Storage tab.** If it is not
+  available, tutor uploads (Phase 4) need a different file host.
+- **Firestore free quota** is roughly 50k reads and 20k writes per day. Phases keep
+  queries narrow and avoid broad live listeners; large lists should be paged.
+
 ## 3. Phases (top-down)
 
 ### Phase 0: Hotfix and groundwork
@@ -136,7 +161,7 @@ The single Admin is replaced by three staff roles, plus Tutor and Student.
 - Phase 0's rule change deploys immediately on its own.
 - Each phase is built on its own branch and tested in the emulator before merging.
 - Rules, functions, indexes and the matching app build deploy together. The Phase 5 rules break the current student build, which is acceptable at v0.1.0 (pre-release).
-- Cloud Functions need the Blaze plan.
+- Cloud Functions need the Blaze plan, which is out of scope while on Spark (see Spark plan constraints).
 
 ## 5. Assumptions (change any of these)
 
