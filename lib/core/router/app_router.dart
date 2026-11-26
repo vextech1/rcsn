@@ -6,6 +6,11 @@ import '../../providers/student_provider.dart';
 import '../constants/user_role.dart';
 import '../../screens/shared/welcome_screen.dart';
 import '../../screens/shared/role_select_screen.dart';
+import '../../data/models/public_post.dart';
+import '../../screens/public/public_home_screen.dart';
+import '../../screens/public/public_post_detail_screen.dart';
+import '../../screens/public/public_compose_screen.dart';
+import '../../screens/public/public_review_screen.dart';
 import '../../screens/staff/auth/staff_login_screen.dart';
 import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
@@ -89,6 +94,23 @@ GoRouter buildAppRouter({
       // Shared entry routes — wired to their real screens.
       GoRoute(path: AppRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: AppRoutes.roleSelect, builder: (_, __) => const RoleSelectScreen()),
+
+      // Public space
+      GoRoute(path: AppRoutes.publicHome, builder: (_, __) => const PublicHomeScreen()),
+      GoRoute(
+        path: AppRoutes.publicPost,
+        // The post travels as `extra`; if it is lost (e.g. the route is
+        // rebuilt without it) fall back to the public home instead of
+        // crashing.
+        builder: (_, state) {
+          final post = state.extra;
+          return post is PublicPost
+              ? PublicPostDetailScreen(post: post)
+              : const PublicHomeScreen();
+        },
+      ),
+      GoRoute(path: AppRoutes.publicNew, builder: (_, __) => const PublicComposeScreen()),
+      GoRoute(path: AppRoutes.publicReview, builder: (_, __) => const PublicReviewScreen()),
 
       // Staff
       GoRoute(path: AppRoutes.staffLogin, builder: (_, __) => const StaffLoginScreen()),
@@ -296,6 +318,29 @@ String? _guard(
       return AppRoutes.studentSearch;
     }
 
+    return null;
+  }
+
+  // ---------------------------------------------------------------
+  // PUBLIC space: readable by anyone, signed in or not. Only posting and
+  // reviewing need a session; the Firestore rules enforce the same.
+  // ---------------------------------------------------------------
+  if (path.startsWith('/public')) {
+    if (path == AppRoutes.publicNew) {
+      if (auth.isResolving) return null;
+      if (!auth.isUsableStaffSession && !auth.isUsableTutorSession) {
+        return AppRoutes.publicHome;
+      }
+      return null;
+    }
+    if (path == AppRoutes.publicReview) {
+      if (auth.isResolving) return null;
+      final role = auth.resolvedRole;
+      final canReview = auth.isUsableStaffSession &&
+          (role == UserRole.principal || role == UserRole.registrar);
+      if (!canReview) return AppRoutes.publicHome;
+      return null;
+    }
     return null;
   }
 

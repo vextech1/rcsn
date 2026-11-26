@@ -20,6 +20,9 @@ const {
   deleteDoc,
   collection,
   serverTimestamp,
+  query,
+  where,
+  Timestamp,
 } = require('firebase/firestore');
 
 let env;
@@ -63,6 +66,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'tutors/tutor3'), { name: 'U', email: 'u@example.com', status: 'active' });
     await setDoc(doc(db, 'tutor_assignments/tutor1_s1'), { tutorId: 'tutor1', subjectId: 's1' });
     await setDoc(doc(db, 'tutor_assignments/tutor2_s1'), { tutorId: 'tutor2', subjectId: 's1' });
+    await setDoc(doc(db, 'public_posts/pub1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'published', createdAt: new Date() });
+    await setDoc(doc(db, 'public_posts/pend1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'pending', createdAt: new Date() });
     await setDoc(doc(db, 'subjects/s1'), subject);
     await setDoc(doc(db, 'content_types/ct1'), { name: 'Notes' });
     await setDoc(doc(db, 'content_items/existing1'), {
@@ -88,6 +93,22 @@ const statusChange = (updatedBy, status) => ({
   status,
   updatedAt: serverTimestamp(),
   updatedBy,
+});
+
+const basePost = (authorId, authorName, authorRole) => ({
+  title: 'Open day',
+  body: 'Everyone is welcome.',
+  category: 'announcement',
+  authorId,
+  authorName,
+  authorRole,
+});
+
+const newPost = (authorId, authorName, authorRole, status, extra = {}) => ({
+  ...basePost(authorId, authorName, authorRole),
+  status,
+  createdAt: serverTimestamp(),
+  ...extra,
 });
 
 const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -268,5 +289,96 @@ describe('student read access (interim public read, no sign-in)', () => {
     await assertFails(getDocs(collection(anon(), 'tutors')));
     await assertFails(getDocs(collection(anon(), 'staff')));
     await assertFails(getDoc(doc(anon(), 'admins/legacy')));
+  });
+});
+
+describe('public space (public_posts)', () => {
+  const published = (db) =>
+    query(collection(db, 'public_posts'), where('status', '==', 'published'));
+
+  it('anyone can read published posts, signed in or not', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'public_posts/pub1')));
+    await assertSucceeds(getDocs(published(anon())));
+    await assertSucceeds(getDocs(published(as('tutor3'))));
+  });
+
+  it('the public cannot read pending posts or list without the published filter', async () => {
+    await assertFails(getDoc(doc(anon(), 'public_posts/pend1')));
+    await assertFails(getDocs(collection(anon(), 'public_posts')));
+    await assertFails(getDoc(doc(as('tutor3'), 'public_posts/pend1')));
+  });
+
+  it('the author and moderators can read a pending post', async () => {
+    await assertSucceeds(getDoc(doc(as('tutor1'), 'public_posts/pend1')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'public_posts/pend1')));
+    await assertSucceeds(getDoc(doc(as('registrar1'), 'public_posts/pend1')));
+    await assertFails(getDoc(doc(as('bursar1'), 'public_posts/pend1')));
+  });
+
+  it('principal, registrar and bursar publish directly as themselves', async () => {
+    await assertSucceeds(setDoc(doc(as('principal1'), 'public_posts/n1'), newPost('principal1', 'Principal', 'principal', 'published')));
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'public_posts/n2'), newPost('registrar1', 'Registrar', 'registrar', 'published')));
+    await assertSucceeds(setDoc(doc(as('bursar1'), 'public_posts/n3'), newPost('bursar1', 'Bursar', 'bursar', 'published')));
+  });
+
+  it('staff cannot spoof their name, role or author, or post as pending', async () => {
+    await assertFails(setDoc(doc(as('bursar1'), 'public_posts/s1'), newPost('bursar1', 'The Principal', 'bursar', 'published')));
+    await assertFails(setDoc(doc(as('bursar1'), 'public_posts/s2'), newPost('bursar1', 'Bursar', 'principal', 'published')));
+    await assertFails(setDoc(doc(as('bursar1'), 'public_posts/s3'), newPost('principal1', 'Bursar', 'bursar', 'published')));
+    await assertFails(setDoc(doc(as('bursar1'), 'public_posts/s4'), newPost('bursar1', 'Bursar', 'bursar', 'pending')));
+  });
+
+  it('an active tutor can only submit pending posts', async () => {
+    await assertSucceeds(setDoc(doc(as('tutor1'), 'public_posts/t1'), newPost('tutor1', 'T', 'tutor', 'pending')));
+    await assertFails(setDoc(doc(as('tutor1'), 'public_posts/t2'), newPost('tutor1', 'T', 'tutor', 'published')));
+  });
+
+  it('suspended tutors, strangers and signed-out users cannot post', async () => {
+    await assertFails(setDoc(doc(as('tutor2'), 'public_posts/x1'), newPost('tutor2', 'S', 'tutor', 'pending')));
+    await assertFails(setDoc(doc(as('attacker'), 'public_posts/x2'), newPost('attacker', 'A', 'tutor', 'pending')));
+    await assertFails(setDoc(doc(anon(), 'public_posts/x3'), newPost('tutor1', 'T', 'tutor', 'pending')));
+  });
+
+  it('posts must be well-formed', async () => {
+    const db = as('principal1');
+    const ok = (extra) => newPost('principal1', 'Principal', 'principal', 'published', extra);
+    await assertFails(setDoc(doc(db, 'public_posts/b1'), ok({ title: 'Hi' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b2'), ok({ category: 'spam' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b3'), ok({ body: '' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b4'), ok({ extra: 1 })));
+    await assertFails(setDoc(doc(db, 'public_posts/b5'), ok({ createdAt: new Date(0) })));
+    await assertFails(setDoc(doc(db, 'public_posts/b6'), ok({ imageUrl: 'http://example.com/a.jpg' })));
+    await assertSucceeds(setDoc(doc(db, 'public_posts/b7'), ok({ imageUrl: 'https://example.com/a.jpg' })));
+  });
+
+  it('events need a date and gallery posts need an image', async () => {
+    const db = as('principal1');
+    const ok = (extra) => newPost('principal1', 'Principal', 'principal', 'published', extra);
+    await assertFails(setDoc(doc(db, 'public_posts/e1'), ok({ category: 'event' })));
+    await assertSucceeds(setDoc(doc(db, 'public_posts/e2'), ok({ category: 'event', eventDate: Timestamp.fromDate(new Date('2027-03-01')) })));
+    await assertFails(setDoc(doc(db, 'public_posts/g1'), ok({ category: 'gallery' })));
+    await assertSucceeds(setDoc(doc(db, 'public_posts/g2'), ok({ category: 'gallery', imageUrl: 'https://example.com/p.jpg' })));
+  });
+
+  it('principal and registrar approve or archive; nobody else can', async () => {
+    const stamp = (uid, status) => ({ status, reviewedBy: uid, reviewedAt: serverTimestamp() });
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'public_posts/pend1'), stamp('principal1', 'published')));
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'public_posts/pub1'), stamp('registrar1', 'archived')));
+    await assertFails(updateDoc(doc(as('bursar1'), 'public_posts/pend1'), stamp('bursar1', 'published')));
+    await assertFails(updateDoc(doc(as('tutor3'), 'public_posts/pend1'), stamp('tutor3', 'published')));
+    await assertFails(updateDoc(doc(as('tutor1'), 'public_posts/pend1'), stamp('tutor1', 'published')));
+  });
+
+  it('an author can withdraw their own post but not publish it or edit it', async () => {
+    await assertSucceeds(updateDoc(doc(as('tutor1'), 'public_posts/pend1'), { status: 'archived' }));
+    await assertFails(updateDoc(doc(as('tutor1'), 'public_posts/pend1'), { status: 'published' }));
+    await assertFails(updateDoc(doc(as('tutor1'), 'public_posts/pub1'), { title: 'Edited' }));
+    await assertFails(updateDoc(doc(as('tutor3'), 'public_posts/pub1'), { status: 'archived' }));
+  });
+
+  it('only principal and registrar can delete', async () => {
+    await assertSucceeds(deleteDoc(doc(as('registrar1'), 'public_posts/pub1')));
+    await assertFails(deleteDoc(doc(as('tutor1'), 'public_posts/pend1')));
+    await assertFails(deleteDoc(doc(anon(), 'public_posts/pend1')));
   });
 });

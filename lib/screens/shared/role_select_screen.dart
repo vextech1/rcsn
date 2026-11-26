@@ -79,6 +79,26 @@ class RoleSelectScreen extends StatelessWidget {
                 icon: Icons.person,
                 onTap: () => context.push(AppRoutes.studentSearch),
               ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () => context.push(AppRoutes.publicHome),
+                  icon: const Icon(Icons.public),
+                  label: Text(
+                    'Continue without login',
+                    style: AppTypography.button(context).copyWith(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

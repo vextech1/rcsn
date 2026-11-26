@@ -100,11 +100,14 @@ class _TutorDashboardScreenState extends State<TutorDashboardScreen> {
               if (value == 'signOut') {
                 await context.read<AuthProvider>().signOut();
                 if (context.mounted) context.go(AppRoutes.roleSelect);
+              } else if (value == 'public') {
+                context.push(AppRoutes.publicHome);
               } else if (value == 'terminate' && tutorId != null) {
                 _confirmSelfTerminate(tutorId);
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'public', child: Text('Public Space')),
               PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
               PopupMenuItem(
                 value: 'terminate',

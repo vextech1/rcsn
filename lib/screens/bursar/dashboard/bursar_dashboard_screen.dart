@@ -17,6 +17,11 @@ class BursarDashboardScreen extends StatelessWidget {
         title: const Text('Bursar'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.campaign),
+            tooltip: 'Public Space',
+            onPressed: () => context.push(AppRoutes.publicHome),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',
             onPressed: () async {

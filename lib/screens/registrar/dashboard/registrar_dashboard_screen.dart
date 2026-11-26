@@ -60,6 +60,11 @@ class RegistrarDashboardScreen extends StatelessWidget {
               label: 'Content Types',
               onTap: () => context.push(AppRoutes.registrarContentTypes),
             ),
+            DashboardTile(
+              icon: Icons.campaign,
+              label: 'Public Space',
+              onTap: () => context.push(AppRoutes.publicHome),
+            ),
           ],
         ),
       ),

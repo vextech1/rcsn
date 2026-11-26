@@ -11,6 +11,12 @@ class AppRoutes {
   static const String welcome = '/';
   static const String roleSelect = '/role-select';
 
+  // Public space (no login needed to read; staff and tutors can post)
+  static const String publicHome = '/public';
+  static const String publicPost = '/public/post';
+  static const String publicNew = '/public/new';
+  static const String publicReview = '/public/review';
+
   // Staff (Principal, Registrar, Bursar share one login)
   static const String staffLogin = '/staff/login';
 

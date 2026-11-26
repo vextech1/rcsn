@@ -113,6 +113,92 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
+    // public_posts — the Public Space (announcements, calendar, sports,
+    // graduations, performances, gallery, general info)
+    // -------------------------------------------------------------------
+    //
+    // Readable by ANYONE who has the app, no sign-in, but only once
+    // published. Principal, Registrar and Bursar publish directly; a
+    // tutor's post is created 'pending' and goes live only when the
+    // Principal or Registrar approves it (tutors self-register, so they
+    // must not be able to broadcast to the whole public unreviewed).
+    // Posts are not edited: withdraw (archive) and repost instead.
+
+    match /public_posts/{postId} {
+      // The public reads published posts. Moderators also see pending and
+      // archived ones; authors see their own. A query must filter on
+      // status == 'published' to be allowed for the public.
+      allow read: if resource.data.status == 'published'
+        || isPrincipal()
+        || isRegistrar()
+        || (request.auth != null && resource.data.authorId == request.auth.uid);
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(
+             ['title', 'body', 'category', 'authorId', 'authorName',
+              'authorRole', 'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly(
+             ['title', 'body', 'category', 'authorId', 'authorName',
+              'authorRole', 'status', 'createdAt', 'eventDate', 'imageUrl'])
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.category in
+             ['announcement', 'event', 'sports', 'graduation',
+              'performance', 'gallery', 'info']
+        && (!('eventDate' in request.resource.data)
+            || request.resource.data.eventDate is timestamp)
+        && (request.resource.data.category != 'event'
+            || 'eventDate' in request.resource.data)
+        && (!('imageUrl' in request.resource.data)
+            || (request.resource.data.imageUrl is string
+                && request.resource.data.imageUrl.matches('https://.+')
+                && request.resource.data.imageUrl.size() <= 500))
+        && (request.resource.data.category != 'gallery'
+            || 'imageUrl' in request.resource.data)
+        && (
+          // Staff publish directly, under their real role and name.
+          (isStaff()
+            && request.resource.data.status == 'published'
+            && request.resource.data.authorRole ==
+                 get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role
+            && request.resource.data.authorName ==
+                 get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.name)
+          ||
+          // Tutors submit for review.
+          (isActiveTutor()
+            && request.resource.data.status == 'pending'
+            && request.resource.data.authorRole == 'tutor'
+            && request.resource.data.authorName ==
+                 get(/databases/$(database)/documents/tutors/$(request.auth.uid)).data.name)
+        );
+
+      // Only the status stamp ever changes. Principal / Registrar publish
+      // or archive; an author can only withdraw (archive) their own post.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+        && (
+          ((isPrincipal() || isRegistrar())
+            && request.resource.data.status in ['published', 'archived']
+            && request.resource.data.reviewedBy == request.auth.uid
+            && request.resource.data.reviewedAt == request.time)
+          ||
+          (resource.data.authorId == request.auth.uid
+            && request.resource.data.status == 'archived'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['status']))
+        );
+
+      allow delete: if isPrincipal() || isRegistrar();
+    }
+
+    // -------------------------------------------------------------------
     // admins — RETIRED. Replaced by `staff`. Locked entirely; the legacy
     // document is migrated by bootstrap-principal.js --from-admin.
     // -------------------------------------------------------------------
