@@ -241,10 +241,12 @@ service cloud.firestore {
     // -------------------------------------------------------------------
 
     match /subjects/{subjectId} {
-      // Authenticated users can read subjects. Needed by tutor dashboard
-      // (to resolve assignment subjectIds to names) and by students
-      // browsing their scoped subjects.
-      allow read: if request.auth != null;
+      // PUBLIC READ (interim, Spark plan). Students have no Firebase Auth
+      // account (NSIN-only access, no password), so a request.auth check
+      // would lock them out of their own dashboard. Structure names are
+      // non-sensitive. Writes stay admin-only below. Phase 5 replaces this
+      // with NSIN-bound student sessions.
+      allow read: if true;
 
       // Create: admin only (Section 2.1 — only Admin builds structure).
       allow create: if isAdmin()
@@ -267,10 +269,12 @@ service cloud.firestore {
     // -------------------------------------------------------------------
 
     match /content_items/{itemId} {
-      // Authenticated users can read content. This is how the tutor
-      // subject viewer and the student subject viewer (when built)
-      // display uploaded files.
-      allow read: if request.auth != null;
+      // PUBLIC READ (interim, Spark plan): the student subject viewer lists
+      // uploaded items without any sign-in. This exposes item metadata
+      // (names, links) to anyone holding the app's public key; the files
+      // themselves stay behind Storage rules. Writes stay tutor/admin-only
+      // below. Phase 5 replaces this with NSIN-bound student sessions.
+      allow read: if true;
 
       // Create: the uploading tutor must be active AND assigned to the
       // subject they are uploading into. Admin can also upload.
@@ -339,10 +343,9 @@ service cloud.firestore {
     // -------------------------------------------------------------------
 
     match /content_types/{typeId} {
-      // Authenticated users can read content types. Needed by the tutor
-      // upload screen's dropdown and the student subject screen's
-      // filter chips.
-      allow read: if request.auth != null;
+      // PUBLIC READ (interim, Spark plan): the student subject screen uses
+      // these for its filter chips. Non-sensitive. Writes stay admin-only.
+      allow read: if true;
 
       // Create: admin only (Section 4.3 — Admin adds new categories at
       // runtime). ContentRepository.seedDefaultContentTypesIfNeeded()

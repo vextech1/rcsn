@@ -64,6 +64,12 @@ beforeEach(async () => {
     await setDoc(doc(db, 'tutor_assignments/tutor1_s1'), { tutorId: 'tutor1', subjectId: 's1' });
     await setDoc(doc(db, 'tutor_assignments/tutor2_s1'), { tutorId: 'tutor2', subjectId: 's1' });
     await setDoc(doc(db, 'subjects/s1'), subject);
+    await setDoc(doc(db, 'content_types/ct1'), { name: 'Notes' });
+    await setDoc(doc(db, 'content_items/existing1'), {
+      subjectId: 's1', contentTypeId: 'ct1', fileName: 'a.pdf',
+      fileUrl: 'https://example.com/a.pdf', storagePath: 'x/a.pdf',
+      isArchived: false, uploadedByTutorId: 'tutor1',
+    });
     await setDoc(doc(db, 'students/stu1'), { nsin: 'X', name: 'Student', status: 'active' });
     await setDoc(doc(db, 'admins/legacy'), { name: 'Old', email: 'old@example.com' });
   });
@@ -237,5 +243,30 @@ describe('content uploads (assignment check)', () => {
 
   it('a signed-out user cannot upload', async () => {
     await assertFails(setDoc(doc(anon(), 'content_items/c5'), item('tutor1')));
+  });
+});
+
+describe('student read access (interim public read, no sign-in)', () => {
+  it('a signed-out student can read subjects, content types and content items', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'subjects/s1')));
+    await assertSucceeds(getDocs(collection(anon(), 'subjects')));
+    await assertSucceeds(getDocs(collection(anon(), 'content_types')));
+    await assertSucceeds(getDocs(collection(anon(), 'content_items')));
+  });
+
+  it('but cannot write any of them', async () => {
+    await assertFails(setDoc(doc(anon(), 'subjects/new'), subject));
+    await assertFails(updateDoc(doc(anon(), 'subjects/s1'), { name: 'Hacked' }));
+    await assertFails(deleteDoc(doc(anon(), 'subjects/s1')));
+    await assertFails(setDoc(doc(anon(), 'content_types/new'), { name: 'X' }));
+    await assertFails(updateDoc(doc(anon(), 'content_items/existing1'), { isArchived: true }));
+    await assertFails(deleteDoc(doc(anon(), 'content_items/existing1')));
+  });
+
+  it('everything else stays closed to signed-out users', async () => {
+    await assertFails(getDoc(doc(anon(), 'tutor_assignments/tutor1_s1')));
+    await assertFails(getDocs(collection(anon(), 'tutors')));
+    await assertFails(getDocs(collection(anon(), 'staff')));
+    await assertFails(getDoc(doc(anon(), 'admins/legacy')));
   });
 });
