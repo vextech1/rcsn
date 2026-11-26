@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/content_item.dart';
 import '../models/content_type_category.dart';
 import '../services/storage_service.dart';
-import '../services/video_compression_service.dart';
 import '../../core/authorization/tutor_authorization_checker.dart';
 import '../../core/constants/content_types.dart';
 import '../../core/errors/app_failure.dart';
@@ -28,17 +27,14 @@ import '../../core/errors/app_failure.dart';
 class ContentRepository {
   final FirebaseFirestore _firestore;
   final StorageService _storageService;
-  final VideoCompressionService _compressionService;
   final TutorAuthorizationChecker _authChecker;
 
   ContentRepository({
     FirebaseFirestore? firestore,
     StorageService? storageService,
-    VideoCompressionService? compressionService,
     TutorAuthorizationChecker? authChecker,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _storageService = storageService ?? StorageService(),
-        _compressionService = compressionService ?? VideoCompressionService(),
         _authChecker = authChecker ?? TutorAuthorizationChecker();
 
   CollectionReference<Map<String, dynamic>> get _content =>
@@ -83,24 +79,16 @@ class ContentRepository {
       fileExtension: fileExtension,
     );
 
-    final fileToUpload = await _compressionService.compressIfNeeded(
-      file: file,
-      fileExtension: fileExtension,
-      onProgress: onProgress == null ? null : (p) => onProgress(p * 0.5),
-    );
-
     final storagePath =
         'subjects/$subjectId/content/${DateTime.now().millisecondsSinceEpoch}_$fileName';
 
     final downloadUrl = await _storageService.uploadFile(
-      file: fileToUpload,
+      file: file,
       storagePath: storagePath,
-      onProgress: onProgress == null
-          ? null
-          : (p) => onProgress(0.5 + p * 0.5), // second half of the progress bar
+      onProgress: onProgress,
     );
 
-    final actualSize = await fileToUpload.length();
+    final actualSize = await file.length();
 
     final draft = ContentItem(
       id: '',

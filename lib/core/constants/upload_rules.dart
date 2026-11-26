@@ -1,6 +1,6 @@
 /// File upload rules, per Section 4.1 of the project document.
 ///
-/// Allowed types: image, PDF, Excel, Word, video. Audio is explicitly
+/// Allowed types: image, PDF, Excel, Word. Audio and video are explicitly
 /// excluded — not an oversight, a deliberate scope decision.
 class UploadRules {
   UploadRules._(); // static-only, never instantiated
@@ -15,25 +15,10 @@ class UploadRules {
     'jpg', 'jpeg', 'png', 'heic',
     // Documents
     'pdf', 'doc', 'docx', 'xls', 'xlsx',
-    // Video
-    'mp4', 'mov', 'avi', 'mkv',
-  ];
-
-  /// Extensions that trigger client-side compression before upload.
-  /// Video is the highest-risk upload type at this file-size ceiling on
-  /// weak mobile connections — compression is required, not optional,
-  /// per Section 4.1's explicit note.
-  static const List<String> videoExtensionsRequiringCompression = [
-    'mp4', 'mov', 'avi', 'mkv',
   ];
 
   static bool isExtensionAllowed(String extension) {
     return allowedExtensions.contains(extension.toLowerCase().replaceAll('.', ''));
-  }
-
-  static bool requiresCompression(String extension) {
-    return videoExtensionsRequiringCompression
-        .contains(extension.toLowerCase().replaceAll('.', ''));
   }
 
   static bool isWithinSizeLimit(int sizeInBytes) {

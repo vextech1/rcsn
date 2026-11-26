@@ -16,7 +16,7 @@ Based on a static read of commit `957975e`. The code has not been compiled or ru
 | 5 | Student | `students` is `read: if true` and the NSIN is the only credential. Anyone with the public API key can list every NSIN. | High |
 | 6 | Student | `AuthProvider` signs out any user with no admin or tutor record, so a Firebase-authenticated student would be signed out immediately. | Blocker for the fix |
 | 7 | Tutor | Self-terminate rule does not restrict which fields change. Tutors can rewrite any field of their own content items (including `subjectId`). `tutors` and `tutor_assignments` are readable by any signed-in user. | Medium |
-| 8 | Tutor | Video compression runs with `includeAudio: false`, which strips the audio track from lecture videos. | Medium |
+| 8 | Tutor | ~~Video compression strips the audio track.~~ Moot: video and audio uploads are no longer supported. | n/a |
 | 9 | Infra | No `storage.rules`, `firestore.indexes.json` or `.firebaserc`. The `content_items` list queries need a composite index. | Medium |
 | 10 | Student | Offline support is partial: files re-download on every tap, local files are saved by `fileName` alone (collisions), and `sqflite`, `connectivity_plus` and `cached_network_image` are declared but unused. | Low |
 | 11 | Housekeeping | Default counter widget test fails. Stale comments ("rules not yet written", "FCM registration not yet built"). Duplicate `com/example/rcsn/MainActivity.kt`. Release builds signed with debug keys. `dev` and `prod` flavor folders are empty. `tutorNotAssigned` is a dead stub route. Cloud Function targets Node 18. | Low |
@@ -130,7 +130,7 @@ Blaze). Everything below is designed around that:
 - [ ] `tutor_assignments` readable by the tutor concerned or staff.
 - [ ] `content_items`: readable by staff or an assigned active tutor; tutor updates limited to `isArchived` and `description`; create requires `storagePath` starting `subjects/{subjectId}/` and an existing content type.
 - [ ] New `storage.rules`: writes and deletes only for an active assigned tutor on `subjects/{id}/content/**`, up to 100MB, allowed types only.
-- [ ] Set `includeAudio: true` in video compression.
+- [x] Video and audio uploads removed; no compression step.
 - [ ] Connectivity check before uploads.
 - [ ] Unique local download path per item (shared with Phase 5).
 

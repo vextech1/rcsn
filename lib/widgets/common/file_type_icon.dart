@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 /// Maps a file extension to an appropriate icon and color.
 ///
 /// Covers exactly the extensions [UploadRules.allowedExtensions] permits
-/// (core/constants/upload_rules.dart) — image, PDF, Excel, Word, video.
+/// (core/constants/upload_rules.dart) — image, PDF, Excel, Word.
 /// If this list and that one ever drift apart (a new extension gets
 /// allowed for upload but has no icon mapping here), the default case
 /// below renders a generic file icon rather than crashing — but that
@@ -43,11 +43,6 @@ class FileTypeIcon extends StatelessWidget {
       case 'xls':
       case 'xlsx':
         return (Icons.table_chart, AppColors.secondary);
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-      case 'mkv':
-        return (Icons.videocam, AppColors.primaryDark);
       default:
         return (Icons.insert_drive_file, AppColors.textMid);
     }

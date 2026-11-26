@@ -40,7 +40,7 @@ class StorageService {
   /// Uploads a file to the given storage path, reporting progress via
   /// [onProgress] (0.0 to 1.0) so the UI can drive the progress indicator
   /// that Section 4.1 explicitly requires for uploads at this file-size
-  /// ceiling — not optional, per that section's note on video risk.
+  /// ceiling — not optional, per that section's note on weak connections.
   ///
   /// [storagePath] is built by the caller (repository layer), typically
   /// something like `subjects/{subjectId}/content/{contentItemId}.{ext}` —

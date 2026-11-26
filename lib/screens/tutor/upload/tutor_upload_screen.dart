@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constants/upload_rules.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -42,7 +43,7 @@ import '../../../widgets/forms/app_text_field.dart';
 /// upload, driven by [ContentProvider.uploadProgress] (0.0–1.0). This is
 /// the concrete UI for Section 4.1's requirement that uploads at the
 /// 100 MB cap must show visible progress — not optional, per that
-/// section's explicit flag on video risk over weak connections.
+/// section's note on weak mobile connections.
 class TutorUploadScreen extends StatefulWidget {
   const TutorUploadScreen({super.key});
 
@@ -77,7 +78,10 @@ class _TutorUploadScreenState extends State<TutorUploadScreen> {
   Future<void> _pickFile() async {
     _localError = null;
 
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: UploadRules.allowedExtensions,
+    );
     if (result == null || result.files.isEmpty) return; // user cancelled
 
     final picked = result.files.single;
@@ -455,7 +459,7 @@ class _FilePickerButton extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Images, PDF, Excel, Word, or video — up to 100 MB',
+              'Images, PDF, Excel, or Word — up to 100 MB',
               style: TextStyle(fontSize: 12, color: AppColors.textMid),
               textAlign: TextAlign.center,
             ),

@@ -9,8 +9,7 @@ import '../core/errors/app_failure.dart';
 ///
 /// [uploadProgress] exists specifically because Section 4.1 requires a
 /// visible progress indicator for uploads at the 100MB cap — not
-/// optional, per that section's explicit flag on video being the
-/// highest-risk upload type on weak connections. Screens bind directly
+/// optional, per that section's note on weak connections. Screens bind directly
 /// to this value rather than each screen managing its own progress
 /// callback plumbing.
 class ContentProvider extends ChangeNotifier {

@@ -80,18 +80,13 @@ class UnsupportedFileTypeFailure extends AppFailure {
   const UnsupportedFileTypeFailure()
       : super(
           'This file type is not supported. '
-          'Allowed: images, PDF, Excel, Word, and video.',
+          'Allowed: images, PDF, Excel, and Word.',
         );
 }
 
 class UploadFailedFailure extends AppFailure {
   const UploadFailedFailure([String? detail])
       : super(detail ?? 'Upload failed. Please check your connection and try again.');
-}
-
-class CompressionFailedFailure extends AppFailure {
-  const CompressionFailedFailure()
-      : super('Video compression failed before upload. Please try again.');
 }
 
 // ---------------------------------------------------------------------
