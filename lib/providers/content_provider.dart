@@ -8,7 +8,7 @@ import '../core/errors/app_failure.dart';
 /// Wraps ContentRepository's upload flow with UI-facing progress state.
 ///
 /// [uploadProgress] exists specifically because Section 4.1 requires a
-/// visible progress indicator for uploads at the 100MB cap — not
+/// visible progress indicator for uploads at the 95 MB cap — not
 /// optional, per that section's note on weak connections. Screens bind directly
 /// to this value rather than each screen managing its own progress
 /// callback plumbing.

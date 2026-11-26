@@ -1,5 +1,5 @@
 /// Formats a byte count into a human-readable size string, used wherever
-/// file size is shown to the user — upload previews, the 100MB-limit
+/// file size is shown to the user — upload previews, the 95 MB-limit
 /// rejection message, file list items.
 class FileSizeFormatter {
   FileSizeFormatter._();

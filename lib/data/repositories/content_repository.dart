@@ -79,8 +79,14 @@ class ContentRepository {
       fileExtension: fileExtension,
     );
 
-    final storagePath =
-        'subjects/$subjectId/content/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    // Slashes would change the path, and the storage Worker caps names at 200
+    // characters (the end is kept, so the extension survives).
+    var objectName =
+        '${DateTime.now().millisecondsSinceEpoch}_${fileName.replaceAll(RegExp(r'[/\\\x00-\x1f]'), '_')}';
+    if (objectName.length > 180) {
+      objectName = objectName.substring(objectName.length - 180);
+    }
+    final storagePath = 'subjects/$subjectId/content/$objectName';
 
     final downloadUrl = await _storageService.uploadFile(
       file: file,

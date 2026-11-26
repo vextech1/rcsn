@@ -7,7 +7,7 @@ import '../../core/utils/file_size_formatter.dart';
 ///
 /// This is a direct, required implementation, not a nice-to-have: Section
 /// 4.1 of the project document explicitly states that visible progress
-/// and retry handling are "required — not optional — given the 100MB
+/// and retry handling are "required — not optional — given the 95 MB
 /// cap," specifically because uploads on weak mobile connections
 /// are flagged as the app's highest-risk failure point. A silent spinner
 /// or no feedback at all during a long upload is exactly the failure

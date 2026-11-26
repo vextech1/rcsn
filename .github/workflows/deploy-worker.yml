@@ -1,0 +1,36 @@
+name: Deploy storage Worker
+
+# Tests and deploys worker/ to Cloudflare. Runs when the Worker changes on main,
+# or manually from the Actions tab. Setup: docs/STORAGE.md.
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**", ".github/workflows/deploy-worker.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm install --no-audit --no-fund
+
+      - run: npm test
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Secret CLOUDFLARE_API_TOKEN is empty or missing"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Secret CLOUDFLARE_ACCOUNT_ID is empty or missing"; exit 1; }
+          npx wrangler deploy

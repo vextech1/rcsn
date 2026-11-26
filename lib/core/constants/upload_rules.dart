@@ -5,10 +5,11 @@
 class UploadRules {
   UploadRules._(); // static-only, never instantiated
 
-  /// 100MB cap, set deliberately generous enough to fit large reference
+  /// 95 MB cap (Cloudflare rejects requests over 100 MB; keep in step with
+  /// worker/src/index.js), set deliberately generous enough to fit large reference
   /// documents (e.g. a Ross & Wilson Anatomy PDF, commonly ~50MB) without
   /// forcing chunked uploads.
-  static const int maxFileSizeBytes = 100 * 1024 * 1024;
+  static const int maxFileSizeBytes = 95 * 1024 * 1024;
 
   static const List<String> allowedExtensions = [
     // Images
@@ -26,5 +27,5 @@ class UploadRules {
   }
 
   /// Human-readable cap for display in upload-rejection messages.
-  static const String maxFileSizeLabel = '100MB';
+  static const String maxFileSizeLabel = '95 MB';
 }

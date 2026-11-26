@@ -28,6 +28,9 @@ jobs:
           node --check functions/index.js
           node --check tools/bootstrap-principal.js
 
+      - name: Storage Worker tests
+        run: cd worker && npm install --no-audit --no-fund && npm test
+
       - name: Rules tests (Firestore emulator)
         shell: bash
         run: |
@@ -73,9 +76,12 @@ jobs:
 
       - name: Build release APKs (one per ABI)
         shell: bash
+        env:
+          # Repository variable: the storage Worker's address (docs/STORAGE.md).
+          STORAGE_URL: ${{ vars.STORAGE_URL }}
         run: |
           set -o pipefail
-          flutter build apk --release --split-per-abi -v 2>&1 | tee build.log
+          flutter build apk --release --split-per-abi --dart-define="STORAGE_URL=$STORAGE_URL" -v 2>&1 | tee build.log
 
       - name: Surface build errors
         if: failure()

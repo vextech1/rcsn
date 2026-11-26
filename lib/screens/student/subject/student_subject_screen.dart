@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../providers/student_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/academic_structure.dart';
@@ -50,6 +51,7 @@ class _StudentSubjectScreenState extends State<StudentSubjectScreen> {
 
   Future<void> _downloadAndOpen(ContentItem item) async {
     if (!mounted) return;
+    final nsin = context.read<StudentProvider>().currentStudent?.nsin;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -71,11 +73,15 @@ class _StudentSubjectScreenState extends State<StudentSubjectScreen> {
     );
 
     try {
+      if (nsin == null) {
+        throw const UnauthorizedActionFailure('Please enter your NSIN again.');
+      }
       final dir = await getApplicationDocumentsDirectory();
       final localPath = '${dir.path}/${item.fileName}';
       final file = await _storageService.downloadForOffline(
         storagePath: item.storagePath,
         localPath: localPath,
+        studentNsin: nsin,
       );
 
       if (!mounted) return;

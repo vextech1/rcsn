@@ -42,7 +42,7 @@ import '../../../widgets/forms/app_text_field.dart';
 /// PROGRESS: [UploadProgressIndicator] replaces the form body during
 /// upload, driven by [ContentProvider.uploadProgress] (0.0–1.0). This is
 /// the concrete UI for Section 4.1's requirement that uploads at the
-/// 100 MB cap must show visible progress — not optional, per that
+/// 95 MB cap must show visible progress — not optional, per that
 /// section's note on weak mobile connections.
 class TutorUploadScreen extends StatefulWidget {
   const TutorUploadScreen({super.key});
@@ -459,7 +459,7 @@ class _FilePickerButton extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Images, PDF, Excel, or Word — up to 100 MB',
+              'Images, PDF, Excel, or Word — up to 95 MB',
               style: TextStyle(fontSize: 12, color: AppColors.textMid),
               textAlign: TextAlign.center,
             ),

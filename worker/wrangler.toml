@@ -1,0 +1,16 @@
+name = "rcsn-files"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+# The private R2 bucket. Leave its Public Development URL disabled.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "school-management-software"
+
+[vars]
+FIREBASE_PROJECT_ID = "school-msa"
+# Website origins allowed to call the Worker from a browser, comma separated,
+# e.g. "https://example.com,https://www.example.com". The Android app does not
+# need this.
+ALLOWED_ORIGINS = ""

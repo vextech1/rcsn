@@ -73,7 +73,7 @@ class UnauthorizedActionFailure extends AppFailure {
 
 class FileTooLargeFailure extends AppFailure {
   const FileTooLargeFailure()
-      : super('This file exceeds the 100MB upload limit.');
+      : super('This file exceeds the 95 MB upload limit.');
 }
 
 class UnsupportedFileTypeFailure extends AppFailure {
@@ -87,6 +87,11 @@ class UnsupportedFileTypeFailure extends AppFailure {
 class UploadFailedFailure extends AppFailure {
   const UploadFailedFailure([String? detail])
       : super(detail ?? 'Upload failed. Please check your connection and try again.');
+}
+
+class DownloadFailedFailure extends AppFailure {
+  const DownloadFailedFailure([String? detail])
+      : super(detail ?? 'Download failed. Please check your connection and try again.');
 }
 
 // ---------------------------------------------------------------------
