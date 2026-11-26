@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/nsin_validator.dart';
@@ -160,10 +162,19 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
 
               // Back to role selection — for a student who tapped
               // "Student" by mistake and wants to go back.
+              //
+              // This screen is not always pushed on top of role selection:
+              // after Clear Session (or an inactive account) the router
+              // redirects here and this is the ONLY page in the stack.
+              // Popping the last page leaves an empty Navigator = black
+              // screen, so go to role selection when there is nothing to
+              // pop back to.
               TextButton(
                 onPressed: student.isSearching
                     ? null
-                    : () => Navigator.of(context).pop(),
+                    : () => context.canPop()
+                        ? context.pop()
+                        : context.go(AppRoutes.roleSelect),
                 child: const Text('← Back to role selection'),
               ),
             ],
