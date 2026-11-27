@@ -18,7 +18,14 @@ import '../fee_status_label.dart';
 /// payment history.
 class BursarFeeDetailScreen extends StatefulWidget {
   final String feeId;
-  const BursarFeeDetailScreen({super.key, required this.feeId});
+  /// The Principal sees the record but changes nothing.
+  final bool readOnly;
+
+  const BursarFeeDetailScreen({
+    super.key,
+    required this.feeId,
+    this.readOnly = false,
+  });
 
   @override
   State<BursarFeeDetailScreen> createState() => _BursarFeeDetailScreenState();
@@ -77,7 +84,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
               Text(fee.name, style: Theme.of(context).textTheme.headlineSmall),
               Text(fee.nsin.isEmpty ? 'No NSIN yet' : fee.nsin),
               Text('Payment code: ${fee.paymentNumber}'),
-              if (fee.nsin.isEmpty)
+              if (fee.nsin.isEmpty && !widget.readOnly)
                 TextButton(
                   onPressed: () => showDialog<void>(
                     context: context,
@@ -95,6 +102,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
               _GuardianNames(
                 repository: _repository,
                 paymentNumber: fee.paymentNumber,
+                readOnly: widget.readOnly,
               ),
               const SizedBox(height: 16),
               _row('Tuition', formatUgx(fee.tuition)),
@@ -107,6 +115,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: FeeStatusLabel(fee.status),
               ),
+              if (!widget.readOnly) ...[
               FilledButton.icon(
                 onPressed: _recordPayment,
                 icon: const Icon(Icons.add),
@@ -123,6 +132,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
                 ),
                 child: const Text('Add another semester'),
               ),
+              ],
               const Divider(height: 32),
               Text('Payments', style: Theme.of(context).textTheme.titleMedium),
               _history(),
@@ -427,9 +437,11 @@ class _NsinDialogState extends State<_NsinDialog> {
 class _GuardianNames extends StatefulWidget {
   final FeeRepository repository;
   final String paymentNumber;
+  final bool readOnly;
   const _GuardianNames({
     required this.repository,
     required this.paymentNumber,
+    required this.readOnly,
   });
 
   @override
@@ -456,7 +468,7 @@ class _GuardianNamesState extends State<_GuardianNames> {
                   ? 'Not recorded. Parents cannot see the fees yet.'
                   : names.join('\n'),
             ),
-            trailing: IconButton(
+            trailing: widget.readOnly ? null : IconButton(
               icon: const Icon(Icons.edit),
               tooltip: 'Edit parent names',
               onPressed: () => showDialog<void>(

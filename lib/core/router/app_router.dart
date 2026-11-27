@@ -139,6 +139,16 @@ GoRouter buildAppRouter({
       // Principal
       GoRoute(path: AppRoutes.principalDashboard, builder: (_, __) => const PrincipalDashboardScreen()),
       GoRoute(path: AppRoutes.principalStaff, builder: (_, __) => const PrincipalStaffScreen()),
+      GoRoute(path: AppRoutes.principalFees, builder: (_, __) => const BursarDashboardScreen(readOnly: true)),
+      GoRoute(
+        path: AppRoutes.principalFeeRecord,
+        builder: (_, state) {
+          final extra = state.extra;
+          return extra is String
+              ? BursarFeeDetailScreen(feeId: extra, readOnly: true)
+              : const BursarDashboardScreen(readOnly: true);
+        },
+      ),
 
       // Registrar (work screens are still the original Admin screens)
       GoRoute(path: AppRoutes.registrarDashboard, builder: (_, __) => const RegistrarDashboardScreen()),

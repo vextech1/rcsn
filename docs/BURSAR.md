@@ -54,7 +54,7 @@ Worker. Fee viewing works only after the Worker has been deployed from `main`.
 1. Bursar screens: list, search, filter, totals, add student, record payment,
    history. **Built.**
 2. Verified fee view (see above). **Built.**
-3. Principal read-only screen.
+3. Principal and Deputy Principal read-only view (**Student Fees**). **Built.**
 4. Later: bulk tuition per class, CSV export, printable clearance.
 
 ## Known gaps

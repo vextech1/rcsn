@@ -49,6 +49,11 @@ class PrincipalDashboardScreen extends StatelessWidget {
               onTap: () => context.push(AppRoutes.principalStaff),
             ),
             DashboardTile(
+              icon: Icons.payments,
+              label: 'Student Fees',
+              onTap: () => context.push(AppRoutes.principalFees),
+            ),
+            DashboardTile(
               icon: Icons.account_tree,
               label: 'Academic Structure',
               onTap: () => context.push(AppRoutes.registrarStructure),

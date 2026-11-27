@@ -13,9 +13,11 @@ import '../../../widgets/common/app_loading_indicator.dart';
 import '../fee_status_label.dart';
 
 /// Bursar landing screen: every tuition record, with search, a status filter
-/// and totals for what is shown.
+/// and totals for what is shown. With [readOnly] it is the Principal's view.
 class BursarDashboardScreen extends StatefulWidget {
-  const BursarDashboardScreen({super.key});
+  final bool readOnly;
+
+  const BursarDashboardScreen({super.key, this.readOnly = false});
 
   @override
   State<BursarDashboardScreen> createState() => _BursarDashboardScreenState();
@@ -30,8 +32,8 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bursar'),
-        actions: [
+        title: Text(widget.readOnly ? 'Student fees' : 'Bursar'),
+        actions: widget.readOnly ? null : [
           IconButton(
             icon: const Icon(Icons.campaign),
             tooltip: 'Public Space',
@@ -47,7 +49,7 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: widget.readOnly ? null : FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.bursarAdd),
         icon: const Icon(Icons.person_add),
         label: const Text('Add student'),
@@ -64,10 +66,12 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
 
           final all = snapshot.data!;
           if (all.isEmpty) {
-            return const AppEmptyState(
+            return AppEmptyState(
               icon: Icons.payments,
               title: 'No fee records yet',
-              message: 'Tap "Add student" to open the first one.',
+              message: widget.readOnly
+                  ? 'The Bursar has not added any.'
+                  : 'Tap "Add student" to open the first one.',
             );
           }
 
@@ -135,7 +139,9 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
                       isThreeLine: true,
                       trailing: FeeStatusLabel(fee.status),
                       onTap: () => context.push(
-                        AppRoutes.bursarRecord,
+                        widget.readOnly
+                            ? AppRoutes.principalFeeRecord
+                            : AppRoutes.bursarRecord,
                         extra: fee.id,
                       ),
                     );

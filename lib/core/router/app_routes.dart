@@ -27,6 +27,8 @@ class AppRoutes {
   // Principal
   static const String principalDashboard = '/principal/dashboard';
   static const String principalStaff = '/principal/staff';
+  static const String principalFees = '/principal/fees';
+  static const String principalFeeRecord = '/principal/fees/record';
 
   // Registrar. The structure/tutors/students/content-types screens are
   // still the original Admin screens, relocated here in Phase 1 and
