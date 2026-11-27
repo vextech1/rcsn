@@ -102,6 +102,13 @@ class TutorRepository {
     return TutorAssignment.fromFirestore(snapshot);
   }
 
+  /// Who teaches a subject.
+  Future<List<String>> tutorIdsFor(String subjectId) async {
+    final found =
+        await _assignments.where('subjectId', isEqualTo: subjectId).get();
+    return [for (final doc in found.docs) doc.data()['tutorId'] as String];
+  }
+
   /// ADMIN-ONLY. Removes a tutor's access to a specific subject without
   /// touching their account status — distinct from suspension/termination
   /// (Section 2.1), which is account-wide, not subject-specific.

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
+import '../../../core/router/app_routes.dart';
+import '../../../core/utils/student_number.dart';
+import '../../../data/models/student_fee.dart';
 import '../../../data/models/student_record.dart';
 import '../../../data/models/tutor_account.dart' show AccountStatus;
 import '../../../data/repositories/student_number_repository.dart';
@@ -38,6 +42,9 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   final _repository = StudentRepository();
   final _nsinController = TextEditingController();
   final _nameController = TextEditingController();
+  final _searchController = TextEditingController();
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  late final _students = _repository.watchAllStudents();
 
   ProgramType? _selectedTrack;
   int? _selectedYear;
@@ -50,6 +57,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   void dispose() {
     _nsinController.dispose();
     _nameController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -87,8 +95,14 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
       );
       _nsinController.clear();
       _nameController.clear();
+      if (mounted) {
+        _scaffoldKey.currentState?.closeEndDrawer();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registered $name.')),
+        );
+      }
     } on AppFailure catch (e) {
-      setState(() => _error = e);
+      if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -133,68 +147,47 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     }
   }
 
+  void _openBio(String bioKey, String label) => context.push(
+        AppRoutes.registrarStudentBio,
+        extra: (bioKey: bioKey, label: label),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Students')),
+      key: _scaffoldKey,
+      appBar: AppBar(
+        title: const Text('Students'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add),
+            tooltip: 'Register a student',
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
+        ],
+      ),
+      // Swiping is left to the system's back gesture.
+      endDrawerEnableOpenDragGesture: false,
+      endDrawer: _buildRegisterDrawer(),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Register a Student (Admission)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search name, student number or payment code',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Clear search',
+                        onPressed: () =>
+                            setState(_searchController.clear),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    AppTextField(
-                      controller: _nsinController,
-                      label: 'Student number',
-                    ),
-                    const SizedBox(height: 12),
-                    AppTextField(
-                      controller: _nameController,
-                      label: 'Full Name',
-                    ),
-                    const SizedBox(height: 12),
-                    AcademicStructurePicker(
-                      initialTrack: _selectedTrack,
-                      initialYear: _selectedYear,
-                      initialSemester: _selectedSemester,
-                      onChanged: (track, year, semester) {
-                        setState(() {
-                          _selectedTrack = track;
-                          _selectedYear = year;
-                          _selectedSemester = semester;
-                        });
-                      },
-                    ),
-                    if (_error != null) AppInlineError(failure: _error!),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _isSubmitting ? null : _createStudent,
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Register Student'),
-                    ),
-                  ],
-                ),
               ),
+              onChanged: (_) => setState(() {}),
             ),
           ),
           const Divider(height: 1),
@@ -204,9 +197,78 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     );
   }
 
+  Widget _buildRegisterDrawer() {
+    return Drawer(
+      width: 340,
+      child: Builder(
+        builder: (context) => SafeArea(
+          child: SingleChildScrollView(
+            // Keeps the lower fields reachable above the keyboard.
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Register a Student (Admission)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: _nsinController,
+                  label: 'Student number',
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: _nameController,
+                  label: 'Full Name',
+                ),
+                const SizedBox(height: 12),
+                AcademicStructurePicker(
+                  initialTrack: _selectedTrack,
+                  initialYear: _selectedYear,
+                  initialSemester: _selectedSemester,
+                  onChanged: (track, year, semester) {
+                    setState(() {
+                      _selectedTrack = track;
+                      _selectedYear = year;
+                      _selectedSemester = semester;
+                    });
+                  },
+                ),
+                if (_error != null) AppInlineError(failure: _error!),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _isSubmitting ? null : _createStudent,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Register Student'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStudentList() {
     return StreamBuilder<List<StudentRecord>>(
-      stream: _repository.watchAllStudents(),
+      stream: _students,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const AppLoadingIndicator();
@@ -217,12 +279,42 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
           );
         }
 
-        final students = snapshot.data ?? [];
+        final all = snapshot.data ?? [];
+        final query = _searchController.text.trim().toLowerCase();
+        final students = all
+            .where((s) =>
+                s.name.toLowerCase().contains(query) ||
+                s.nsin.toLowerCase().contains(query))
+            .toList()
+          ..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
         if (students.isEmpty) {
-          return const AppEmptyState(
+          // A new student may only have a payment code so far.
+          final code = StudentFee.normalizeNumber(query);
+          if (StudentFee.numberError(code) == null) {
+            return ListView(
+              children: [
+                const ListTile(title: Text('No registered student matches.')),
+                ListTile(
+                  leading: const Icon(Icons.badge),
+                  title: Text('Bio data for payment code $code'),
+                  subtitle: const Text(
+                    'For a student with no student number yet',
+                  ),
+                  onTap: () => _openBio(code, 'Payment code $code'),
+                ),
+              ],
+            );
+          }
+          return AppEmptyState(
             icon: Icons.badge_outlined,
-            title: 'No students registered yet',
-            message: 'Students entered at admission will appear here.',
+            title: all.isEmpty
+                ? 'No students registered yet'
+                : 'No student matches',
+            message: all.isEmpty
+                ? 'Tap the add-person icon at the top to register one.'
+                : 'Check the name or student number.',
           );
         }
 
@@ -233,14 +325,28 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
           itemBuilder: (context, index) {
             final student = students[index];
             return ListTile(
+              onTap: () => context.push(
+                AppRoutes.registrarStudentDetail,
+                extra: student,
+              ),
               title: Text(student.name),
               subtitle: Text(
                 '${student.nsin} · Year ${student.year}, Sem ${student.semester} '
                 '· ${_statusLabel(student.status)}',
               ),
-              trailing: PopupMenuButton<AccountStatus>(
-                onSelected: (status) => _changeStatus(student, status),
+              trailing: PopupMenuButton<Object>(
+                onSelected: (choice) {
+                  if (choice is AccountStatus) {
+                    _changeStatus(student, choice);
+                  } else {
+                    _openBio(
+                      StudentNumber.bioKey(student.nsin),
+                      '${student.name} · ${student.nsin}',
+                    );
+                  }
+                },
                 itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'bio', child: Text('Bio data')),
                   if (student.status != AccountStatus.active)
                     const PopupMenuItem(
                       value: AccountStatus.active,

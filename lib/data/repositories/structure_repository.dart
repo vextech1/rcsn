@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/subject.dart';
 import '../../core/constants/academic_structure.dart';
+import '../../core/constants/course_catalogue.dart';
 import '../../core/errors/app_failure.dart';
 
 /// Owns all reads/writes to the Subject collection.
@@ -84,6 +85,36 @@ class StructureRepository {
     if (!doc.exists) return null;
     return Subject.fromFirestore(doc);
   }
+
+  /// Adds catalogue units to a class in one write. [units] maps each unit to
+  /// the name to save, which the Registrar may have changed. Callers pass only
+  /// units the class does not have.
+  Future<void> addStandardSubjects({
+    required ProgramType programType,
+    required int year,
+    required int semester,
+    required Map<CourseUnit, String> units,
+  }) async {
+    final batch = _firestore.batch();
+    units.forEach((unit, name) {
+      batch.set(
+        _subjects.doc(standardSubjectId(programType, unit)),
+        Subject(
+          id: '',
+          name: name,
+          programType: programType,
+          year: year,
+          semester: semester,
+          createdAt: DateTime.now(),
+        ).toFirestore(),
+      );
+    });
+    await batch.commit();
+  }
+
+  /// Content and tutor assignments stay with the subject.
+  Future<void> renameSubject(String subjectId, String name) =>
+      _subjects.doc(subjectId).update({'name': name});
 
   Future<void> deleteSubject(String subjectId) async {
     // Note: this does NOT cascade-delete ContentItems or TutorAssignments
