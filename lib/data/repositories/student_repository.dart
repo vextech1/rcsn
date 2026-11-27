@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/student_record.dart';
 import '../models/tutor_account.dart' show AccountStatus;
 import '../../core/constants/academic_structure.dart';
-import '../../core/utils/nsin_validator.dart';
+import '../../core/utils/student_number.dart';
 import '../../core/errors/app_failure.dart';
 
 /// Owns StudentRecord creation (Admin, at admission) and NSIN lookup
@@ -10,13 +10,13 @@ import '../../core/errors/app_failure.dart';
 ///
 /// Deliberate separation of concerns, worth stating explicitly: this
 /// repository checks whether an NSIN EXISTS in Firestore.
-/// [NsinValidator] (core/utils/nsin_validator.dart) checks whether an
+/// [StudentNumber] (core/utils/student_number.dart) checks whether an
 /// NSIN is well-FORMED. These are different questions — a syntactically
 /// perfect NSIN can still not exist (typo, or a genuinely fake number),
 /// and format validation should reject obvious garbage before ever
 /// spending a network round-trip on a lookup that was always going to
 /// fail. [findByNsin] assumes the input has already passed
-/// [NsinValidator.isValidFormat] — callers (the student search screen)
+/// [StudentNumber.basicError] — callers (the student search screen)
 /// are expected to check format first and show a format error locally
 /// before ever calling this method.
 class StudentRepository {
@@ -45,7 +45,7 @@ class StudentRepository {
     required int year,
     required int semester,
   }) async {
-    final normalized = NsinValidator.normalize(nsin);
+    final normalized = StudentNumber.normalize(nsin);
 
     // Guard against Admin accidentally creating two records for the same
     // NSIN — a real, easy-to-make data-entry mistake at admission time
@@ -53,7 +53,7 @@ class StudentRepository {
     final existing = await findByNsin(normalized);
     if (existing != null) {
       throw UnknownFailure(
-        'A student record already exists for NSIN $normalized.',
+        'A student record already exists for number $normalized.',
       );
     }
 
@@ -79,7 +79,7 @@ class StudentRepository {
   /// directly, since "not found" is an expected, common outcome here
   /// (a mistyped NSIN), not an exceptional one.
   Future<StudentRecord?> findByNsin(String nsin) async {
-    final normalized = NsinValidator.normalize(nsin);
+    final normalized = StudentNumber.normalize(nsin);
     final query =
         await _students.where('nsin', isEqualTo: normalized).limit(1).get();
 

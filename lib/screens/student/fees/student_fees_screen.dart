@@ -172,7 +172,7 @@ class _FeeCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(fee.name),
-            Text(fee.nsin.isEmpty ? 'No NSIN yet' : fee.nsin),
+            Text(fee.nsin.isEmpty ? 'No student number yet' : fee.nsin),
             Text('Payment code: ${fee.paymentNumber}'),
             Text(kTrackDefinitions[fee.programType]?.label ??
                 fee.programType.name),

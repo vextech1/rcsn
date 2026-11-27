@@ -15,7 +15,7 @@ import '../../../widgets/common/app_error_display.dart';
 /// [StudentProvider]'s doc comment. Because the NSIN is persisted in
 /// shared_preferences, a student who borrows someone else's phone would
 /// see the phone owner's data. Clear Session removes the persisted NSIN
-/// and returns to the NSIN entry screen so the borrower can enter their
+/// and returns to the student number screen so the borrower can enter their
 /// own.
 ///
 /// Per the product decision referenced in [StudentProvider]: this action
@@ -64,7 +64,7 @@ class StudentSettingsScreen extends StatelessWidget {
                     style: AppTypography.caption(context),
                   ),
                   const Divider(height: 24),
-                  _InfoRow(label: 'NSIN', value: student.nsin),
+                  _InfoRow(label: 'Student number', value: student.nsin),
                   _InfoRow(
                     label: 'Status',
                     value: student.status.name,
@@ -96,10 +96,10 @@ class StudentSettingsScreen extends StatelessWidget {
                   // AppTypography.caption(context) is a runtime call,
                   // incompatible with const regardless of what's passed.
                   Text(
-                    'Removes your NSIN from this device. Use this if '
+                    'Removes your student number from this device. Use this if '
                     'you are borrowing someone else\'s phone, or before '
                     'handing your phone to another student. You will '
-                    'return to the NSIN entry screen afterward.',
+                    'return to the student number screen afterward.',
                     style: AppTypography.caption(context),
                   ),
                   const SizedBox(height: 12),
@@ -127,7 +127,7 @@ class StudentSettingsScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Clear your session?'),
         content: const Text(
-          'Your NSIN will be removed from this device. You will need '
+          'Your student number will be removed from this device. You will need '
           'to enter it again to access your academic information.',
         ),
         actions: [

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/student_fee.dart';
 import '../../core/constants/academic_structure.dart';
 import '../../core/errors/app_failure.dart';
-import '../../core/utils/nsin_validator.dart';
+import '../../core/utils/student_number.dart';
 
 /// Bursar's tuition records. The Firestore rules are the real boundary; they
 /// also require every change to `paid` to come with a matching payment entry.
@@ -46,7 +46,7 @@ class FeeRepository {
   Future<String?> numberFor(String nsin) async {
     if (nsin.trim().isEmpty) return null;
     final found = await _fees
-        .where('nsin', isEqualTo: NsinValidator.normalize(nsin))
+        .where('nsin', isEqualTo: StudentNumber.normalize(nsin))
         .limit(1)
         .get();
     return found.docs.isEmpty
@@ -130,7 +130,7 @@ class FeeRepository {
     required int semester,
     required int tuition,
   }) async {
-    final normalized = NsinValidator.normalize(nsin);
+    final normalized = StudentNumber.normalize(nsin);
     final number = StudentFee.normalizeNumber(paymentNumber);
     final ref = _fees.doc(StudentFee.idFor(number, year, semester));
     final numberRef = _numbers.doc(number);
@@ -185,10 +185,10 @@ class FeeRepository {
   /// Attaches the NSIN a new student has now been given to every record under
   /// their payment number. Possible once only.
   Future<void> attachNsin(String paymentNumber, String nsin) async {
-    final normalized = NsinValidator.normalize(nsin);
+    final normalized = StudentNumber.normalize(nsin);
     final existing = await numberFor(normalized);
     if (existing != null) {
-      throw FeeFailure('That NSIN already has payment number $existing.');
+      throw FeeFailure('That student number already has payment code $existing.');
     }
     await _run(() async {
       final records = await _fees

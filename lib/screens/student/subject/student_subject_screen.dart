@@ -74,7 +74,7 @@ class _StudentSubjectScreenState extends State<StudentSubjectScreen> {
 
     try {
       if (nsin == null) {
-        throw const UnauthorizedActionFailure('Please enter your NSIN again.');
+        throw const UnauthorizedActionFailure('Please enter your student number again.');
       }
       final dir = await getApplicationDocumentsDirectory();
       final localPath = '${dir.path}/${item.fileName}';

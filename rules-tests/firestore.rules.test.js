@@ -673,6 +673,21 @@ describe('student fees', () => {
     }
     await assertSucceeds(bulk.commit());
   });
+  it('lets only the registrar set, edit or delete the number format', async () => {
+    const path = 'settings/studentNumber';
+    const set = (uid, formats = ['##-@@@']) =>
+      setDoc(doc(as(uid), path), { formats, ...stamp(uid) });
+    for (const uid of ['principal1', 'bursar1']) await assertFails(set(uid));
+    await assertFails(set('registrar1', []));
+    await assertSucceeds(set('registrar1'));
+    await assertSucceeds(set('registrar1', ['###', '@@@']));
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+    await assertFails(deleteDoc(doc(as('bursar1'), path)));
+    await assertSucceeds(deleteDoc(doc(as('registrar1'), path)));
+  });
+  it('accepts student numbers in any well-formed shape', async () => {
+    await assertSucceeds(open({ nsin: '26-0042' }, '26-0042'));
+  });
   it('never deletes', async () => {
     await assertSucceeds(open());
     await assertSucceeds(pay(400, 400));

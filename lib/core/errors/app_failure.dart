@@ -45,7 +45,7 @@ class StaffManagementFailure extends AppFailure {
 class NsinNotFoundFailure extends AppFailure {
   const NsinNotFoundFailure()
       : super(
-          'No student record found for that NSIN. '
+          'No student record found for that student number. '
           'Please check the number or contact Admin.',
         );
 }

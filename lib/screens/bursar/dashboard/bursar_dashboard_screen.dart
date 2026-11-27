@@ -104,7 +104,7 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
                   decoration: const InputDecoration(
-                    labelText: 'Search name, NSIN or payment number',
+                    labelText: 'Search name, student number or payment code',
                     prefixIcon: Icon(Icons.search),
                   ),
                   onChanged: (value) => setState(() => _search = value),

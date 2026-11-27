@@ -7,9 +7,10 @@ import '../../../core/router/app_routes.dart';
 import '../../../core/utils/fee_export.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/utils/save_file.dart';
-import '../../../core/utils/nsin_validator.dart';
+import '../../../core/utils/student_number.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
+import '../../../data/repositories/student_number_repository.dart';
 import '../../../widgets/common/app_empty_state.dart';
 import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/common/app_loading_indicator.dart';
@@ -117,7 +118,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               Text(fee.name, style: Theme.of(context).textTheme.headlineSmall),
-              Text(fee.nsin.isEmpty ? 'No NSIN yet' : fee.nsin),
+              Text(fee.nsin.isEmpty ? 'No student number yet' : fee.nsin),
               Text('Payment code: ${fee.paymentNumber}'),
               if (fee.nsin.isEmpty && !widget.readOnly)
                 TextButton(
@@ -129,7 +130,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
                       paymentNumber: fee.paymentNumber,
                     ),
                   ),
-                  child: const Text('Add NSIN'),
+                  child: const Text('Add student number'),
                 ),
               Text(kTrackDefinitions[fee.programType]?.label ??
                   fee.programType.name),
@@ -430,6 +431,8 @@ class _NsinDialogState extends State<_NsinDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
+      final mismatch = await StudentNumberRepository().check(_nsin.text);
+      if (mismatch != null) throw UnknownFailure(mismatch);
       await widget.repository.attachNsin(widget.paymentNumber, _nsin.text);
       if (mounted) Navigator.of(context).pop();
     } on AppFailure catch (e) {
@@ -445,7 +448,7 @@ class _NsinDialogState extends State<_NsinDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add NSIN'),
+      title: const Text('Add student number'),
       content: Form(
         key: _formKey,
         child: Column(
@@ -454,8 +457,8 @@ class _NsinDialogState extends State<_NsinDialog> {
             const Text('Check it carefully. It cannot be changed afterwards.'),
             AppTextField(
               controller: _nsin,
-              label: 'NSIN',
-              validator: (v) => NsinValidator.errorMessage(v ?? ''),
+              label: 'Student number',
+              validator: (v) => StudentNumber.basicError(v ?? ''),
             ),
             if (_error != null) AppInlineError(failure: _error!),
           ],

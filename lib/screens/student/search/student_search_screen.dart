@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/utils/nsin_validator.dart';
+import '../../../core/utils/student_number.dart';
 import '../../../providers/student_provider.dart';
 import '../../../widgets/common/app_loading_indicator.dart';
 import '../../../widgets/forms/app_text_field.dart';
@@ -105,7 +105,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
               const SizedBox(height: 24),
 
               Text(
-                'Enter your NSIN to continue',
+                'Enter your student number to continue',
                 textAlign: TextAlign.center,
                 style: AppTypography.heading3(context),
               ),
@@ -118,9 +118,8 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
               // correct color), so this widget can no longer be const at
               // all, regardless of what's passed to style.
               Text(
-                'Your National Student Identification Number was given '
-                'to you at admission. If you don\'t know it, contact '
-                'the school administration.',
+                'Your student number was given to you at admission. If you '
+                'don\'t know it, contact the school administration.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMuted(context),
               ),
@@ -128,14 +127,12 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
               const SizedBox(height: 32),
 
               // NSIN input field — validates format client-side via
-              // NsinValidator before any network call.
+              // StudentNumber before any network call.
               AppTextField(
                 controller: _nsinController,
-                label: 'NSIN',
+                label: 'Student number',
                 keyboardType: TextInputType.text,
-                validator: (value) => NsinValidator.errorMessage(
-                  value ?? '',
-                ),
+                validator: (value) => StudentNumber.basicError(value ?? ''),
                 error: lastError,
               ),
 
@@ -168,7 +165,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                     ? null
                     : () => context.push(AppRoutes.feeLookup),
                 icon: const Icon(Icons.payments),
-                label: const Text('Parent, guardian or no NSIN? Use payment code'),
+                label: const Text('Parent, guardian or no student number? Use payment code'),
               ),
 
               const SizedBox(height: 12),

@@ -26,6 +26,7 @@ import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
 import '../../screens/registrar/bio/registrar_bio_screen.dart';
+import '../../screens/registrar/student_number/student_number_format_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
 import '../../screens/bursar/bulk/bursar_bulk_tuition_screen.dart';
 import '../../data/models/student_fee.dart';
@@ -201,6 +202,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
 
       GoRoute(path: AppRoutes.registrarBio, builder: (_, __) => const RegistrarBioScreen()),
+      GoRoute(path: AppRoutes.registrarStudentNumber, builder: (_, __) => const StudentNumberFormatScreen()),
 
       // Bursar
       GoRoute(path: AppRoutes.bursarBulk, builder: (_, __) => const BursarBulkTuitionScreen()),
@@ -421,7 +423,7 @@ String? _guard(
   // ---------------------------------------------------------------
   if (isStudentRoute) {
     if (isStudentPublicRoute) {
-      // The NSIN entry screen must stay reachable without a session, but
+      // The student number screen must stay reachable without a session, but
       // a student whose NSIN has been found must never be left on the
       // form: StudentSearchScreen shows "Loading your account..." in
       // that state and relies on this redirect to move on. Without it

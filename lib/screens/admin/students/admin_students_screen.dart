@@ -3,6 +3,7 @@ import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../data/models/student_record.dart';
 import '../../../data/models/tutor_account.dart' show AccountStatus;
+import '../../../data/repositories/student_number_repository.dart';
 import '../../../data/repositories/student_repository.dart';
 import '../../../widgets/common/app_empty_state.dart';
 import '../../../widgets/common/app_error_display.dart';
@@ -63,7 +64,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
         _selectedSemester == null) {
       setState(() {
         _error = const UnknownFailure(
-          'Enter the NSIN, name, and select track, year, and semester.',
+          'Enter the student number, name, and select track, year, and semester.',
         );
       });
       return;
@@ -75,13 +76,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     });
 
     try {
-      // NSIN format is intentionally NOT validated here beyond basic
-      // presence — per the planning conversation, the real course-code
-      // segments are still unconfirmed for five of six tracks, and
-      // NsinValidator's shape-check is deliberately permissive. Admin
-      // entering a real school-issued NSIN should never be rejected by
-      // an incomplete validator; createStudentRecord's own duplicate
-      // check is the meaningful guard at this step.
+      final mismatch = await StudentNumberRepository().check(nsin);
+      if (mismatch != null) throw UnknownFailure(mismatch);
       await _repository.createStudentRecord(
         nsin: nsin,
         name: name,
@@ -161,7 +157,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                     const SizedBox(height: 12),
                     AppTextField(
                       controller: _nsinController,
-                      label: 'NSIN',
+                      label: 'Student number',
                     ),
                     const SizedBox(height: 12),
                     AppTextField(

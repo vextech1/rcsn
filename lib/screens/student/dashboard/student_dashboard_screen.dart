@@ -125,7 +125,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         appBar: AppBar(title: const Text('Student Dashboard')),
         body: const AppErrorDisplay(
           failure: UnknownFailure(
-            'No active student session. Please enter your NSIN to '
+            'No active student session. Please enter your student number to '
             'continue.',
           ),
         ),
@@ -269,7 +269,7 @@ class _StudentInfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'NSIN: ${_maskNsin(student.nsin)}',
+            'Student number: ${_maskNumber(student.nsin)}',
             style: AppTypography.caption(context).copyWith(
               fontFamily: 'monospace',
               letterSpacing: 0.5,
@@ -280,14 +280,10 @@ class _StudentInfoCard extends StatelessWidget {
     );
   }
 
-  /// Masks the NSIN for privacy on the dashboard — shows the intake
-  /// and school prefix, hides the course code and sequence number.
-  /// Example: "JAN21/U028/CCN/002" → "JAN21/U028/•••/•••"
-  static String _maskNsin(String nsin) {
-    final parts = nsin.split('/');
-    if (parts.length != 4) return nsin;
-    return '${parts[0]}/${parts[1]}/•••/•••';
-  }
+  /// Hides the last three characters of the student number on the dashboard.
+  static String _maskNumber(String number) => number.length <= 3
+      ? '•••'
+      : '${number.substring(0, number.length - 3)}•••';
 }
 
 /// A tappable subject row — subject name as the title, no trailing
