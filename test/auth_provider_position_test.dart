@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rcsn_mobile_app/core/constants/user_role.dart';
 import 'package:rcsn_mobile_app/core/errors/app_failure.dart';
