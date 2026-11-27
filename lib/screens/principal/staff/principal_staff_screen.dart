@@ -14,7 +14,8 @@ import '../../../widgets/forms/app_text_field.dart';
 
 /// Staff management for the Principal and the Deputy Principal: list staff,
 /// add someone in any position, manage the list of custom positions, suspend
-/// or reactivate staff, and re-send a set-password invite.
+/// or reactivate staff, edit their details, and re-send a set-password
+/// invite.
 ///
 /// The Principal is above the Deputy Principal: only the Principal can
 /// appoint the Deputy, and only the Principal can terminate them (one-way).
@@ -143,6 +144,19 @@ class _PrincipalStaffScreenState extends State<PrincipalStaffScreen> {
     }
   }
 
+  Future<void> _editStaff(StaffAccount staff) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _EditStaffDialog(
+        repository: _repository,
+        positionRepository: _positionRepository,
+        staff: staff,
+      ),
+    );
+    if (saved == true) _snack('Details updated.');
+  }
+
   Future<void> _resendInvite(StaffAccount staff) async {
     setState(() => _busyId = staff.id);
     try {
@@ -192,6 +206,7 @@ class _PrincipalStaffScreenState extends State<PrincipalStaffScreen> {
               staff: staff[i],
               busy: _busyId == staff[i].id,
               canManage: _canManage(staff[i]),
+              onEdit: () => _editStaff(staff[i]),
               onToggleStatus: () => _toggleStatus(staff[i]),
               onResendInvite: () => _resendInvite(staff[i]),
             ),
@@ -206,6 +221,7 @@ class _StaffTile extends StatelessWidget {
   final StaffAccount staff;
   final bool busy;
   final bool canManage;
+  final VoidCallback onEdit;
   final VoidCallback onToggleStatus;
   final VoidCallback onResendInvite;
 
@@ -213,6 +229,7 @@ class _StaffTile extends StatelessWidget {
     required this.staff,
     required this.busy,
     required this.canManage,
+    required this.onEdit,
     required this.onToggleStatus,
     required this.onResendInvite,
   });
@@ -250,10 +267,15 @@ class _StaffTile extends StatelessWidget {
               ? null
               : PopupMenuButton<String>(
                   onSelected: (value) {
+                    if (value == 'edit') onEdit();
                     if (value == 'toggle') onToggleStatus();
                     if (value == 'invite') onResendInvite();
                   },
                   itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit details'),
+                    ),
                     PopupMenuItem(
                       value: 'toggle',
                       child: Text(toggleLabel),
@@ -440,6 +462,197 @@ class _AddStaffDialogState extends State<_AddStaffDialog> {
                   ),
                 )
               : const Text('Create'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Edit someone's name and, for custom-position staff, their position title.
+/// The email is their login and the role decides what they can do, so those
+/// are shown but cannot be changed here.
+class _EditStaffDialog extends StatefulWidget {
+  final StaffRepository repository;
+  final StaffPositionRepository positionRepository;
+  final StaffAccount staff;
+
+  const _EditStaffDialog({
+    required this.repository,
+    required this.positionRepository,
+    required this.staff,
+  });
+
+  @override
+  State<_EditStaffDialog> createState() => _EditStaffDialogState();
+}
+
+class _EditStaffDialogState extends State<_EditStaffDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+
+  List<String> _titles = const [];
+  String? _selectedTitle;
+  bool _loadingPositions = false;
+  bool _submitting = false;
+  AppFailure? _error;
+
+  /// Only custom-position staff have an editable position title; Registrar,
+  /// Bursar and Deputy Principal are their own position.
+  bool get _hasEditablePosition => widget.staff.role == UserRole.staffMember;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.staff.name);
+    if (_hasEditablePosition) {
+      _selectedTitle = widget.staff.position?.trim();
+      _loadingPositions = true;
+      _loadPositions();
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPositions() async {
+    var custom = <StaffPosition>[];
+    try {
+      custom = await widget.positionRepository.fetchCustomPositions();
+    } catch (_) {
+      // Still usable: the current title stays selectable.
+    }
+    if (!mounted) return;
+    final titles = <String>{
+      if (_selectedTitle != null && _selectedTitle!.isNotEmpty) _selectedTitle!,
+      for (final p in custom) p.title,
+    };
+    setState(() {
+      _titles = titles.toList();
+      _loadingPositions = false;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final name = _nameController.text.trim();
+    final title = _hasEditablePosition ? _selectedTitle : null;
+    final unchanged = name == widget.staff.name.trim() &&
+        (!_hasEditablePosition || title == widget.staff.position?.trim());
+    if (unchanged) {
+      Navigator.of(context).pop(false);
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.repository.updateDetails(
+        staffId: widget.staff.id,
+        name: name,
+        position: title,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on AppFailure catch (e) {
+      if (mounted) setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit details'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(
+                controller: _nameController,
+                label: 'Full name',
+                validator: (v) => (v == null || v.trim().length < 2)
+                    ? 'Enter the full name'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: widget.staff.email,
+                enabled: false,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  helperText: 'This is their login, so it cannot be changed '
+                      'here.',
+                  helperMaxLines: 2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (!_hasEditablePosition)
+                TextFormField(
+                  initialValue: widget.staff.positionLabel,
+                  enabled: false,
+                  decoration: const InputDecoration(labelText: 'Position'),
+                )
+              else if (_loadingPositions)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _titles.contains(_selectedTitle) ? _selectedTitle : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Position'),
+                  items: [
+                    for (final t in _titles)
+                      DropdownMenuItem<String>(value: t, child: Text(t)),
+                  ],
+                  validator: (v) => (v == null || v.trim().length < 2)
+                      ? 'Choose a position'
+                      : null,
+                  onChanged: _submitting
+                      ? null
+                      : (t) => setState(() => _selectedTitle = t),
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                AppInlineError(failure: _error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_submitting || _loadingPositions) ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Save'),
         ),
       ],
     );

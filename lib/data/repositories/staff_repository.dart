@@ -188,6 +188,43 @@ class StaffRepository {
     }
   }
 
+  /// Edits someone else's details: their name and, for a custom-position
+  /// staff member, their position title ([position] is null for everyone
+  /// else). The email (their login), role and status cannot be changed
+  /// here. Enforced by the `staff` rules: Principal or Deputy Principal,
+  /// never themselves, never the Principal record, and the Deputy's record
+  /// only by the Principal.
+  Future<void> updateDetails({
+    required String staffId,
+    required String name,
+    String? position,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw const UnauthorizedActionFailure('Please sign in again.');
+    }
+    final cleanName = name.trim();
+    if (cleanName.length < 2 || cleanName.length > 100) {
+      throw const StaffManagementFailure(
+        'Enter the full name (2 to 100 characters).',
+      );
+    }
+    final title = position?.trim();
+    if (title != null && (title.length < 2 || title.length > 60)) {
+      throw const StaffManagementFailure('Choose a position.');
+    }
+    try {
+      await _staff.doc(staffId).update({
+        'name': cleanName,
+        if (title != null) 'position': title,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': uid,
+      });
+    } catch (e) {
+      throw _mapWriteError(e);
+    }
+  }
+
   Future<FirebaseApp> _secondaryApp() async {
     for (final app in Firebase.apps) {
       if (app.name == _secondaryAppName) return app;

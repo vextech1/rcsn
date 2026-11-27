@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/errors/app_failure.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/content_type_category.dart';
 import '../../../providers/content_provider.dart';
 import '../../../widgets/common/app_empty_state.dart';
@@ -20,13 +21,13 @@ import '../../../widgets/forms/app_text_field.dart';
 /// upload flow and Admin's category management, the same dual-purpose
 /// design TutorProvider uses. No new provider needed here.
 ///
-/// NOT BUILT HERE, deliberately: renaming or deleting an existing
-/// category. Nothing in the planning conversation specified either —
-/// deleting one that's already in use by existing ContentItems would
-/// orphan those items' contentTypeId, which is a real data-integrity
-/// question (cascade delete? block deletion? show as "Unknown type"?)
-/// that was never decided. Flagging this as a genuinely open gap rather
-/// than silently deciding it by leaving delete out.
+/// Each category has a menu with Rename and Delete.
+///  - Rename is always safe: uploads point at a category by id, so they
+///    follow the new name straight away.
+///  - Delete is refused while any upload (archived ones included) is filed
+///    under the category, because deleting it would orphan those uploads.
+///    The security rules cannot count documents, so the check is in
+///    ContentRepository.deleteContentType.
 class AdminContentTypesScreen extends StatefulWidget {
   const AdminContentTypesScreen({super.key});
 
@@ -41,11 +42,77 @@ class _AdminContentTypesScreenState extends State<AdminContentTypesScreen> {
 
   bool _isSubmitting = false;
   AppFailure? _error;
+  String? _busyId;
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _rename(ContentTypeCategory type) async {
+    final renamed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _RenameTypeDialog(provider: _provider, type: type),
+    );
+    if (renamed == true) _snack('Renamed.');
+  }
+
+  Future<void> _delete(ContentTypeCategory type) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete "${type.name}"?'),
+        content: const Text(
+          'Tutors will no longer see it as an upload category. A category '
+          'that uploads are filed under cannot be deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busyId = type.id);
+    try {
+      await _provider.deleteContentType(type.id);
+      _snack('"${type.name}" deleted.');
+    } on AppFailure catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot delete'),
+          content: Text(e.message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _snack('Could not delete: $e');
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
   }
 
   Future<void> _addContentType() async {
@@ -167,10 +234,118 @@ class _AdminContentTypesScreenState extends State<AdminContentTypesScreen> {
             return ListTile(
               leading: const Icon(Icons.label_outline),
               title: Text(type.name),
+              trailing: _busyId == type.id
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'rename') _rename(type);
+                        if (value == 'delete') _delete(type);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'rename',
+                          child: Text('Rename'),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                        ),
+                      ],
+                    ),
             );
           },
         );
       },
+    );
+  }
+}
+
+/// Rename dialog: shows the problem (too short, name already taken) inline
+/// and only closes once the rename has actually been saved.
+class _RenameTypeDialog extends StatefulWidget {
+  final ContentProvider provider;
+  final ContentTypeCategory type;
+
+  const _RenameTypeDialog({required this.provider, required this.type});
+
+  @override
+  State<_RenameTypeDialog> createState() => _RenameTypeDialogState();
+}
+
+class _RenameTypeDialogState extends State<_RenameTypeDialog> {
+  late final TextEditingController _controller;
+  bool _saving = false;
+  AppFailure? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.type.name);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _controller.text.trim();
+    if (name == widget.type.name) {
+      Navigator.of(context).pop(false);
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.provider.renameContentType(id: widget.type.id, name: name);
+      if (mounted) Navigator.of(context).pop(true);
+    } on AppFailure catch (e) {
+      if (mounted) setState(() => _error = e);
+    } catch (e) {
+      if (mounted) setState(() => _error = UnknownFailure(e.toString()));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename category'),
+      content: AppTextField(
+        controller: _controller,
+        label: 'Category Name',
+        error: _error,
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }
