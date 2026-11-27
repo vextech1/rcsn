@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/services/auth_service.dart';
 import '../data/repositories/staff_repository.dart';
-import '../data/repositories/staff_position_repository.dart';
 import '../data/repositories/tutor_repository.dart';
 import '../data/models/staff_account.dart';
 import '../data/models/staff_position.dart';
@@ -26,17 +24,14 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final StaffRepository _staffRepository;
   final TutorRepository _tutorRepository;
-  final StaffPositionRepository _positionRepository;
 
   AuthProvider({
     AuthService? authService,
     StaffRepository? staffRepository,
     TutorRepository? tutorRepository,
-    StaffPositionRepository? positionRepository,
   })  : _authService = authService ?? AuthService(),
         _staffRepository = staffRepository ?? StaffRepository(),
-        _tutorRepository = tutorRepository ?? TutorRepository(),
-        _positionRepository = positionRepository ?? StaffPositionRepository() {
+        _tutorRepository = tutorRepository ?? TutorRepository() {
     _authService.authStateChanges.listen(_onAuthStateChanged);
   }
 
@@ -115,15 +110,6 @@ class AuthProvider extends ChangeNotifier {
         } else if (staff.isActive) {
           _staffAccount = staff;
           _resolvedRole = staff.role;
-          // The Principal and Deputy Principal options leave the Staff
-          // screen once their holder has signed in. Best effort: failing to
-          // record it must never block sign-in.
-          if (staff.role == UserRole.principal ||
-              staff.role == UserRole.deputyPrincipal) {
-            unawaited(
-              _positionRepository.markSlotClaimed(staff.role).catchError((_) {}),
-            );
-          }
         } else {
           await _rejectSession(const AccountSuspendedFailure());
         }

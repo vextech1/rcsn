@@ -12,8 +12,7 @@ import '../../../widgets/common/app_loading_indicator.dart';
 ///
 /// The list is Principal, Deputy Principal, Registrar and Bursar plus every
 /// position the Principal or Deputy Principal added (Askari, Accountant,
-/// Clinical Instructor, ...). Principal and Deputy Principal drop off the
-/// list once their holder has signed in, so nobody else is offered them.
+/// Clinical Instructor, ...). Every position stays on the list.
 ///
 /// Picking a position grants nothing by itself: the account is still created
 /// by the Principal or Deputy Principal, and sign-in checks that the account

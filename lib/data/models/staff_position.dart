@@ -62,8 +62,9 @@ class StaffPosition {
     bursar,
   ];
 
-  /// Principal and Deputy Principal have exactly one holder. Their option
-  /// leaves the list once that person has signed in.
+  /// Principal and Deputy Principal have exactly one holder. They stay on the
+  /// list (people need to find them to sign in); the sign-in itself only
+  /// works for the account that really holds the position.
   bool get isSingleHolder =>
       role == UserRole.principal || role == UserRole.deputyPrincipal;
 
