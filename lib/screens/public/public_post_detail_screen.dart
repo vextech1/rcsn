@@ -8,6 +8,7 @@ import '../../core/theme/app_typography.dart';
 import '../../data/models/public_post.dart';
 import '../../data/repositories/public_post_repository.dart';
 import '../../providers/auth_provider.dart';
+import 'post_attachments.dart';
 import 'public_post_widgets.dart';
 
 /// A single public post in full. The author, or a Principal / Registrar,
@@ -97,8 +98,7 @@ class _PublicPostDetailScreenState extends State<PublicPostDetailScreen> {
       ),
       body: ListView(
         children: [
-          if (post.imageUrl != null)
-            PostImage(url: post.imageUrl!, fit: BoxFit.cover, height: 240),
+          if (postCover(post, height: 240) case final cover?) cover,
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -128,6 +128,7 @@ class _PublicPostDetailScreenState extends State<PublicPostDetailScreen> {
                 ],
                 const SizedBox(height: 18),
                 SelectableText(post.body, style: AppTypography.body(context)),
+                PostAttachments(post: post),
               ],
             ),
           ),

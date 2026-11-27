@@ -1,6 +1,9 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/upload_rules.dart';
 import '../../core/errors/app_failure.dart';
 import '../../data/models/public_post.dart';
 import '../../data/repositories/public_post_repository.dart';
@@ -12,8 +15,8 @@ import 'public_post_widgets.dart';
 /// Bursar) and tutors. Staff posts go live at once; a tutor's post is
 /// submitted for the Principal or Registrar to approve.
 ///
-/// Image: there is no file storage on the free plan yet, so a photo is
-/// added as a direct https link to an image.
+/// Pictures and documents are uploaded, with the same types and size limit as
+/// tutor uploads. Video and audio are added as a link.
 class PublicComposeScreen extends StatefulWidget {
   const PublicComposeScreen({super.key});
 
@@ -26,7 +29,11 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  final _imageController = TextEditingController();
+  final _mediaController = TextEditingController();
+  static const _maxFiles = 10;
+  final List<PostFile> _files = [];
+  int _uploading = 0; // which file is being sent
+  String? _fileError;
 
   PublicCategory _category = PublicCategory.announcement;
   DateTime? _eventDate;
@@ -38,7 +45,7 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
-    _imageController.dispose();
+    _mediaController.dispose();
     super.dispose();
   }
 
@@ -58,10 +65,46 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
     }
   }
 
+  Future<void> _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: UploadRules.allowedExtensions,
+    );
+    if (result == null || !mounted) return;
+
+    String? problem;
+    final added = <PostFile>[];
+    for (final picked in result.files) {
+      final path = picked.path;
+      if (path == null ||
+          !UploadRules.isExtensionAllowed(picked.extension ?? '')) {
+        problem = '${picked.name} cannot be uploaded.';
+      } else if (picked.size == 0 ||
+          !UploadRules.isWithinSizeLimit(picked.size)) {
+        problem = '${picked.name} is empty or larger than '
+            '${UploadRules.maxFileSizeLabel}.';
+      } else if (_files.length + added.length >= _maxFiles) {
+        problem = 'A post can have at most $_maxFiles files.';
+      } else {
+        added.add((name: picked.name, file: File(path)));
+      }
+    }
+    setState(() {
+      _files.addAll(added);
+      _fileError = problem;
+    });
+  }
+
   Future<void> _submit(AuthProvider auth) async {
     final valid = _formKey.currentState!.validate();
     if (_category == PublicCategory.event && _eventDate == null) {
       setState(() => _dateError = 'Pick the date of the event');
+      return;
+    }
+    if (_category == PublicCategory.gallery &&
+        !_files.any((f) => PublicPost.isPicture(f.name))) {
+      setState(() => _fileError = 'Gallery posts need a JPG or PNG picture');
       return;
     }
     if (!valid) return;
@@ -103,7 +146,11 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
         authorRole: authorRole,
         publishDirectly: publishDirectly,
         eventDate: _category == PublicCategory.event ? _eventDate : null,
-        imageUrl: _imageController.text.trim(),
+        mediaUrl: _mediaController.text.trim(),
+        files: List.of(_files),
+        onUploading: (number) {
+          if (mounted) setState(() => _uploading = number);
+        },
       );
       messenger.showSnackBar(SnackBar(
         content: Text(publishDirectly
@@ -115,7 +162,12 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
     } on AppFailure catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _uploading = 0;
+        });
+      }
     }
   }
 
@@ -217,29 +269,64 @@ class _PublicComposeScreenState extends State<PublicComposeScreen> {
                   ),
               ],
               const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _submitting ? null : _pickFiles,
+                icon: const Icon(Icons.attach_file),
+                label: const Text('Add pictures or documents'),
+              ),
+              for (final f in _files)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: PublicPost.isPicture(f.name)
+                      ? Image.file(f.file,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          cacheWidth: 144)
+                      : const Icon(Icons.description),
+                  title: Text(f.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Remove',
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _files.remove(f)),
+                  ),
+                ),
+              if (_fileError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 12),
+                  child: Text(
+                    _fileError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
               TextFormField(
-                controller: _imageController,
+                controller: _mediaController,
                 keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                  labelText: _category == PublicCategory.gallery
-                      ? 'Photo link (https://...)'
-                      : 'Photo link (optional, https://...)',
-                  helperText: 'A direct link to an image',
-                  border: const OutlineInputBorder(),
+                decoration: const InputDecoration(
+                  labelText: 'Video or audio link (optional)',
+                  helperText: 'A link starting with https://',
+                  border: OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final value = (v ?? '').trim();
-                  if (value.isEmpty) {
-                    return _category == PublicCategory.gallery
-                        ? 'Gallery posts need a photo link'
-                        : null;
-                  }
+                  if (value.isEmpty) return null;
                   if (!value.startsWith('https://') || value.length > 500) {
                     return 'Use a link starting with https://';
                   }
                   return null;
                 },
               ),
+              if (_uploading > 0) ...[
+                const SizedBox(height: 16),
+                Text('Uploading file $_uploading of ${_files.length}…'),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 AppInlineError(failure: _error!),

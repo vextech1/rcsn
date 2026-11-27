@@ -3,6 +3,7 @@
 //   PUT    /files/subjects/{subjectId}/content/{fileName}   upload
 //   GET    /files/subjects/{subjectId}/content/{fileName}   download
 //   DELETE /files/subjects/{subjectId}/content/{fileName}   delete
+//   PUT, GET, DELETE /files/public/{uid}/{postId}/{fileName}  public post files
 //
 // Callers prove who they are with either
 //   Authorization: Bearer <Firebase ID token>   (staff and tutors), or
@@ -29,6 +30,7 @@ const CONTENT_TYPES = {
 
 import { HttpError, firestoreBase } from './common.js';
 import { fees } from './fees.js';
+import { publicFile } from './public.js';
 
 const JWKS_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -94,13 +96,18 @@ const strings = (doc) =>
   );
 
 async function getDoc(env, path, token) {
+  const found = await getDocument(env, path, token);
+  return found ? strings(found) : null;
+}
+
+async function getDocument(env, path, token) {
   const res = await fetch(`${firestoreBase(env)}/${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   // 403/404 both mean "no such record for this caller".
   if (res.status === 403 || res.status === 404) return null;
   if (!res.ok) throw new HttpError(503, 'Could not check your access. Try again.');
-  return strings(await res.json());
+  return res.json();
 }
 
 async function findStudent(env, nsin) {
@@ -247,6 +254,9 @@ async function handle(request, env) {
   if (pathname === '/fees') {
     if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
     return fees(request, env);
+  }
+  if (pathname.startsWith('/files/public/')) {
+    return publicFile(request, env, pathname, { verifyIdToken, getDocument, upload, download, remove });
   }
   const file = parseKey(pathname);
   if (!file) throw new HttpError(404, 'Not found.');

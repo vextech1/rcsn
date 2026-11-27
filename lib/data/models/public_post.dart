@@ -74,8 +74,14 @@ class PublicPost {
   /// Set for calendar events.
   final DateTime? eventDate;
 
-  /// A direct https link to an image (no file storage on the free plan).
+  /// A picture link, only on posts made before files could be uploaded.
   final String? imageUrl;
+
+  /// A link to a video or audio recording.
+  final String? mediaUrl;
+
+  /// Names of the uploaded pictures and documents.
+  final List<String> attachments;
 
   const PublicPost({
     required this.id,
@@ -89,7 +95,23 @@ class PublicPost {
     this.createdAt,
     this.eventDate,
     this.imageUrl,
+    this.mediaUrl,
+    this.attachments = const [],
   });
+
+  /// Whether the app can show this file as a picture (it cannot show HEIC).
+  static bool isPicture(String fileName) =>
+      RegExp(r'\.(jpe?g|png)$', caseSensitive: false).hasMatch(fileName);
+
+  static String filePath(String authorId, String postId, String fileName) =>
+      'public/$authorId/$postId/$fileName';
+
+  String pathOf(String fileName) => filePath(authorId, id, fileName);
+
+  List<String> get pictures => attachments.where(isPicture).toList();
+
+  List<String> get documents =>
+      attachments.where((name) => !isPicture(name)).toList();
 
   String get authorRoleLabel {
     switch (authorRole) {
@@ -137,6 +159,9 @@ class PublicPost {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
       imageUrl: data['imageUrl'] as String?,
+      mediaUrl: data['mediaUrl'] as String?,
+      attachments: (data['attachments'] as List?)?.whereType<String>().toList() ??
+          const [],
     );
   }
 }
