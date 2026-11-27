@@ -92,6 +92,10 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
               Text(kTrackDefinitions[fee.programType]?.label ??
                   fee.programType.name),
               Text('Year ${fee.year} · Semester ${fee.semester}'),
+              _GuardianNames(
+                repository: _repository,
+                paymentNumber: fee.paymentNumber,
+              ),
               const SizedBox(height: 16),
               _row('Tuition', formatUgx(fee.tuition)),
               _row('Paid', formatUgx(fee.paid)),
@@ -404,6 +408,154 @@ class _NsinDialogState extends State<_NsinDialog> {
             ),
             if (_error != null) AppInlineError(failure: _error!),
           ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GuardianNames extends StatefulWidget {
+  final FeeRepository repository;
+  final String paymentNumber;
+  const _GuardianNames({
+    required this.repository,
+    required this.paymentNumber,
+  });
+
+  @override
+  State<_GuardianNames> createState() => _GuardianNamesState();
+}
+
+class _GuardianNamesState extends State<_GuardianNames> {
+  late final _names = widget.repository.watchGuardians(widget.paymentNumber);
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<List<String>>(
+        stream: _names,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Text('Could not load the parent names.');
+          }
+          final names = snapshot.data;
+          if (names == null) return const Text('Loading parent names…');
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Parent or guardian'),
+            subtitle: Text(
+              names.isEmpty
+                  ? 'Not recorded. Parents cannot see the fees yet.'
+                  : names.join('\n'),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit parent names',
+              onPressed: () => showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => _GuardianDialog(
+                  repository: widget.repository,
+                  paymentNumber: widget.paymentNumber,
+                  names: names,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+}
+
+class _GuardianDialog extends StatefulWidget {
+  final FeeRepository repository;
+  final String paymentNumber;
+  final List<String> names;
+  const _GuardianDialog({
+    required this.repository,
+    required this.paymentNumber,
+    required this.names,
+  });
+
+  @override
+  State<_GuardianDialog> createState() => _GuardianDialogState();
+}
+
+class _GuardianDialogState extends State<_GuardianDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _fields = [
+    for (var i = 0; i < 2; i++)
+      TextEditingController(
+        text: i < widget.names.length ? widget.names[i] : '',
+      ),
+  ];
+  AppFailure? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    for (final c in _fields) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await widget.repository.setGuardians(
+        widget.paymentNumber,
+        [for (final c in _fields) c.text],
+      );
+      if (mounted) Navigator.of(context).pop();
+    } on AppFailure catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Parent or guardian'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTextField(
+                controller: _fields[0],
+                label: 'Full names',
+                validator: (v) {
+                  final length = (v ?? '').trim().length;
+                  return length < 2 || length > 100
+                      ? 'Enter the full names'
+                      : null;
+                },
+              ),
+              AppTextField(
+                controller: _fields[1],
+                label: 'Second person (optional)',
+                validator: (v) => (v ?? '').trim().length > 100
+                    ? 'At most 100 characters'
+                    : null,
+              ),
+              if (_error != null) AppInlineError(failure: _error!),
+            ],
+          ),
         ),
       ),
       actions: [

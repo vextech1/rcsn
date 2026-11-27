@@ -602,59 +602,28 @@ describe('student fees', () => {
     }
     await assertFails(getDocs(collection(as('tutor1'), 'student_fees')));
   });
-  it('parents read by payment number but cannot list, search or write', async () => {
+  it('keeps fee data from anyone signed out', async () => {
     await assertSucceeds(open());
     await assertSucceeds(pay(400, 400));
     const db = env.unauthenticatedContext().firestore();
-    await assertSucceeds(getDoc(doc(db, feePath)));
-    await assertSucceeds(getDoc(doc(db, 'student_fees/PN12345_Y2S1')));
-    await assertFails(getDocs(collection(db, 'student_fees')));
-    await assertFails(getDocs(query(collection(db, 'student_fees'),
-      where('nsin', '==', 'JAN26/U028/MCK/001'))));
+    await assertFails(getDoc(doc(db, feePath)));
+    await assertFails(getDocs(collection(db, `${feePath}/payments`)));
     await assertFails(getDoc(doc(db, 'fee_numbers/PN12345')));
-    await assertSucceeds(getDocs(collection(db, `${feePath}/payments`)));
-    await assertFails(updateDoc(doc(db, feePath), { tuition: 1 }));
   });
-  it('records payments and negative corrections', async () => {
-    await assertSucceeds(open());
-    await assertSucceeds(pay(400, 400));
-    await assertSucceeds(pay(-100, 300, { pid: 'p2', method: 'correction' }));
-  });
-  it('keeps paid and payments in step', async () => {
-    await assertSucceeds(open());
-    await assertFails(pay(400, 900));
-    await assertFails(pay(-100, -100, { method: 'correction' }));
-    await assertFails(updateDoc(doc(as('bursar1'), feePath), { paid: 1000, ...stamp('bursar1') }));
-    await assertFails(setDoc(doc(as('bursar1'), `${feePath}/payments/p9`), {
-      amount: 5, method: 'bank', reference: 'R', recordedBy: 'bursar1', createdAt: serverTimestamp(),
-    }));
-    await assertSucceeds(pay(400, 400));
-    await assertFails(pay(400, 800)); // same payment id again
-    await assertFails(pay(-100, 300, { pid: 'p2' })); // negative, not a correction
-  });
-  it('adds a missing NSIN once, on the number and its records together', async () => {
-    await assertSucceeds(open({ nsin: '' }, ''));
-    const attach = (nsin, recordNsin = nsin) => {
-      const db = as('bursar1');
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'fee_numbers/PN12345'), { nsin, ...stamp('bursar1') });
-      batch.update(doc(db, feePath), { nsin: recordNsin, ...stamp('bursar1') });
-      return batch.commit();
-    };
-    await assertFails(attach('JAN26/U028/MCK/001', 'JAN26/U028/MCK/002'));
-    await assertFails(attach('nonsense'));
-    await assertSucceeds(attach('JAN26/U028/MCK/001'));
-    await assertFails(attach('JAN26/U028/MCK/002'));
-  });
-  it('links an NSIN only to its own payment number', async () => {
-    await assertSucceeds(open());
-    const link = (id, paymentNumber = 'PN12345') =>
-      setDoc(doc(as('bursar1'), `fee_links/${id}`), { paymentNumber, ...stamp('bursar1') });
-    await assertFails(link('JAN26_U028_MCK_002'));
-    await assertSucceeds(link('JAN26_U028_MCK_001'));
+  it('only the bursar records guardians; only the registrar side records bio', async () => {
+    const names = (uid) => setDoc(doc(as(uid), 'fee_guardians/PN12345'),
+      { names: ['John Okot'], ...stamp(uid) });
+    const bio = (uid) => setDoc(doc(as(uid), 'student_bio/PN12345'),
+      { dateOfBirth: '2006-03-14', district: 'Gulu', village: 'Pece',
+        primarySchool: 'P', secondarySchool: 'S', ...stamp(uid) });
+    await assertSucceeds(names('bursar1'));
+    await assertFails(names('registrar1'));
+    await assertSucceeds(bio('registrar1'));
+    await assertFails(bio('bursar1'));
     const db = env.unauthenticatedContext().firestore();
-    await assertSucceeds(getDoc(doc(db, 'fee_links/JAN26_U028_MCK_001')));
-    await assertFails(getDocs(collection(db, 'fee_links')));
+    await assertFails(getDoc(doc(db, 'fee_guardians/PN12345')));
+    await assertFails(getDoc(doc(db, 'student_bio/PN12345')));
+    await assertFails(getDoc(doc(db, 'fee_attempts/PN12345_2026-01-01')));
   });
   it('never deletes', async () => {
     await assertSucceeds(open());

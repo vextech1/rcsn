@@ -18,6 +18,7 @@ import '../../screens/staff/dashboard/staff_member_dashboard_screen.dart';
 import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
+import '../../screens/registrar/bio/registrar_bio_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
 import '../../data/models/student_fee.dart';
 import '../../screens/student/fees/student_fees_screen.dart';
@@ -145,6 +146,8 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarTutors, builder: (_, __) => const AdminTutorsScreen()),
       GoRoute(path: AppRoutes.registrarStudents, builder: (_, __) => const AdminStudentsScreen()),
       GoRoute(path: AppRoutes.registrarContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
+
+      GoRoute(path: AppRoutes.registrarBio, builder: (_, __) => const RegistrarBioScreen()),
 
       // Bursar
       GoRoute(path: AppRoutes.bursarDashboard, builder: (_, __) => const BursarDashboardScreen()),

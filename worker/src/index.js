@@ -27,15 +27,11 @@ const CONTENT_TYPES = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
+import { HttpError, firestoreBase } from './common.js';
+import { fees } from './fees.js';
+
 const JWKS_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
-
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 // ---------------------------------------------------------------- Firebase token
 
@@ -90,9 +86,6 @@ async function verifyIdToken(token, projectId) {
 }
 
 // ---------------------------------------------------------------- Firestore
-
-const firestoreBase = (env) =>
-  `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
 // Flattens Firestore's typed values; only string fields are needed here.
 const strings = (doc) =>
@@ -241,7 +234,7 @@ function withCors(request, env, response) {
   if (!origin || !allowed.includes(origin)) return response;
   const out = new Response(response.body, response);
   out.headers.set('Access-Control-Allow-Origin', origin);
-  out.headers.set('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
+  out.headers.set('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
   out.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Student-NSIN');
   out.headers.set('Access-Control-Max-Age', '86400');
   out.headers.append('Vary', 'Origin');
@@ -250,7 +243,12 @@ function withCors(request, env, response) {
 
 async function handle(request, env) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
-  const file = parseKey(new URL(request.url).pathname);
+  const { pathname } = new URL(request.url);
+  if (pathname === '/fees') {
+    if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
+    return fees(request, env);
+  }
+  const file = parseKey(pathname);
   if (!file) throw new HttpError(404, 'Not found.');
   if (!['GET', 'PUT', 'DELETE'].includes(request.method)) {
     throw new HttpError(405, 'Method not allowed.');

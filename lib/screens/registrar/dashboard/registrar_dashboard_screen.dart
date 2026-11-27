@@ -56,6 +56,11 @@ class RegistrarDashboardScreen extends StatelessWidget {
               onTap: () => context.push(AppRoutes.registrarStudents),
             ),
             DashboardTile(
+              icon: Icons.badge,
+              label: 'Student Bio Data',
+              onTap: () => context.push(AppRoutes.registrarBio),
+            ),
+            DashboardTile(
               icon: Icons.category,
               label: 'Content Types',
               onTap: () => context.push(AppRoutes.registrarContentTypes),

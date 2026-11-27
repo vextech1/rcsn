@@ -57,6 +57,7 @@ let mf;
 before(() => {
   mf = new Miniflare({
     modules: true,
+    modulesRules: [{ type: 'ESModule', include: ['**/*.js'] }],
     scriptPath: fileURLToPath(new URL('../src/index.js', import.meta.url)),
     compatibilityDate: '2026-08-01',
     r2Buckets: ['BUCKET'],

@@ -33,6 +33,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   late final _number =
       TextEditingController(text: widget.from?.paymentNumber);
   final _tuition = TextEditingController();
+  final _guardians = [TextEditingController(), TextEditingController()];
 
   ProgramType? _track;
   int? _year;
@@ -55,6 +56,9 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
     _name.dispose();
     _number.dispose();
     _tuition.dispose();
+    for (final c in _guardians) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -117,6 +121,16 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
         semester: _semester!,
         tuition: parseUgx(_tuition.text)!,
       );
+      // Left blank (e.g. for another semester), existing names are kept.
+      final names = [for (final c in _guardians) c.text];
+      if (names.any((n) => n.trim().isNotEmpty)) {
+        try {
+          await FeeRepository().setGuardians(_number.text, names);
+        } on AppFailure {
+          // The record is saved; the detail screen shows the names as
+          // missing and lets the Bursar add them.
+        }
+      }
       if (mounted) {
         context.pushReplacement(AppRoutes.bursarRecord, extra: id);
       }
@@ -133,9 +147,11 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
       appBar: AppBar(title: const Text('Add student fees')),
       body: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             AppTextField(
               controller: _nsin,
               label: 'NSIN (leave empty if not yet given)',
@@ -188,6 +204,18 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
                   ? null
                   : 'Enter the tuition in shillings',
             ),
+            for (var i = 0; i < 2; i++) ...[
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: _guardians[i],
+                label: i == 0
+                    ? 'Parent or guardian full names'
+                    : 'Second parent or guardian (optional)',
+                validator: (v) => (v ?? '').trim().length > 100
+                    ? 'At most 100 characters'
+                    : null,
+              ),
+            ],
             if (_error != null) AppInlineError(failure: _error!),
             const SizedBox(height: 20),
             FilledButton(
@@ -195,6 +223,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
               child: const Text('Save'),
             ),
           ],
+          ),
         ),
       ),
     );

@@ -42,28 +42,6 @@ class FeeRepository {
   CollectionReference<Map<String, dynamic>> get _numbers =>
       _firestore.collection('fee_numbers');
 
-  /// Points an NSIN to its payment number, so either one opens the records.
-  DocumentReference<Map<String, dynamic>> _link(String nsin) =>
-      _firestore.collection('fee_links').doc(nsin.replaceAll('/', '_'));
-
-  /// The records for an NSIN, for parents and students (no sign-in).
-  Future<List<StudentFee>> findByNsin(String nsin) async {
-    final normalized = NsinValidator.normalize(nsin);
-    final String? number;
-    try {
-      final link = await _link(normalized)
-          .get(const GetOptions(source: Source.server));
-      number = link.data()?['paymentNumber'] as String?;
-    } on FirebaseException {
-      throw const FeeFailure(
-        'Could not load the fees. Check your connection and try again.',
-      );
-    }
-    if (number == null) return [];
-    final records = await findByNumber(number);
-    return records.where((f) => f.nsin == normalized).toList();
-  }
-
   /// The payment number already attached to this student, if any.
   Future<String?> numberFor(String nsin) async {
     if (nsin.trim().isEmpty) return null;
@@ -76,28 +54,25 @@ class FeeRepository {
         : StudentFee.fromFirestore(found.docs.first).paymentNumber;
   }
 
-  /// A student's own view: every semester filed under [paymentNumber].
-  /// Direct reads only, because the rules do not let students search.
-  Future<List<StudentFee>> findByNumber(String paymentNumber) async {
-    final number = StudentFee.normalizeNumber(paymentNumber);
-    try {
-      final docs = await Future.wait([
-        for (final year in [3, 2, 1])
-          for (final semester in [2, 1])
-            _fees.doc(StudentFee.idFor(number, year, semester)).get(
-                  // Never show a cached balance as the current one.
-                  const GetOptions(source: Source.server),
-                ),
-      ]);
-      return [
-        for (final doc in docs)
-          if (doc.exists) StudentFee.fromFirestore(doc),
-      ];
-    } on FirebaseException {
-      throw const FeeFailure(
-        'Could not load your fees. Check your connection and try again.',
-      );
-    }
+  DocumentReference<Map<String, dynamic>> _guardians(String paymentNumber) =>
+      _firestore.collection('fee_guardians').doc(paymentNumber);
+
+  /// Parent or guardian names, used to check a parent asking for the fees.
+  Stream<List<String>> watchGuardians(String paymentNumber) =>
+      _guardians(paymentNumber).snapshots().map(
+            (doc) => List<String>.from(doc.data()?['names'] as List? ?? []),
+          );
+
+  /// One or two names. Blank ones are dropped.
+  Future<void> setGuardians(String paymentNumber, List<String> names) {
+    final kept = [
+      for (final name in names)
+        if (name.trim().isNotEmpty) name.trim(),
+    ];
+    return _run(
+      () => _guardians(StudentFee.normalizeNumber(paymentNumber))
+          .set({'names': kept, ..._stamp()}),
+    );
   }
 
   /// Opens a student's record for a semester, with nothing paid yet.
@@ -144,12 +119,6 @@ class FeeRepository {
               'This student already has a record for that semester.',
             );
           }
-          // All reads must come before the first write.
-          final needsLink = normalized.isNotEmpty &&
-              !(await tx.get(_link(normalized))).exists;
-          if (needsLink) {
-            tx.set(_link(normalized), {'paymentNumber': number, ..._stamp()});
-          }
           if (!owner.exists) {
             tx.set(numberRef, {'nsin': normalized, ..._stamp()});
           }
@@ -183,10 +152,6 @@ class FeeRepository {
       final batch = _firestore.batch()
         ..update(_numbers.doc(paymentNumber), {
           'nsin': normalized,
-          ..._stamp(),
-        })
-        ..set(_link(normalized), {
-          'paymentNumber': paymentNumber,
           ..._stamp(),
         });
       for (final doc in records.docs) {
