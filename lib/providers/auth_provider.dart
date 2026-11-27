@@ -9,6 +9,12 @@ import '../data/models/tutor_account.dart';
 import '../core/constants/user_role.dart';
 import '../core/errors/app_failure.dart';
 
+/// Which login the person used. A sign-in is rejected (and signed out) when
+/// the account belongs to the other door, so a Tutor password never opens the
+/// Staff door and a staff password never opens the Tutor door. Null means
+/// "no restriction": restored sessions, first-run setup and tutor registration.
+enum LoginDoor { staff, tutor }
+
 /// Tracks the currently signed-in staff member or Tutor and their
 /// resolved role.
 ///
@@ -53,6 +59,10 @@ class AuthProvider extends ChangeNotifier {
   // pick is rejected instead of silently landing on another dashboard.
   StaffPosition? _selectedPosition;
 
+  // The login door used for the sign-in in progress; consumed with
+  // [_selectedPosition] when the account resolves.
+  LoginDoor? _selectedDoor;
+
   User? get firebaseUser => _firebaseUser;
   UserRole? get resolvedRole => _resolvedRole;
   StaffAccount? get staffAccount => _staffAccount;
@@ -96,11 +106,21 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Take (and clear) what the person picked for this sign-in before any
+      // await, so it can never leak into a later one.
+      final door = _selectedDoor;
+      final selected = _selectedPosition;
+      _selectedDoor = null;
+      _selectedPosition = null;
+
       final staff = await _staffRepository.getStaffById(user.uid);
       if (staff != null) {
-        final selected = _selectedPosition;
-        _selectedPosition = null;
-        if (staff.isActive &&
+        if (door == LoginDoor.tutor) {
+          await _rejectSession(UnknownFailure(
+            'This account is ${staff.positionLabel}, not a Tutor. '
+            'Go back and choose Staff.',
+          ));
+        } else if (staff.isActive &&
             selected != null &&
             !selected.matches(staff)) {
           await _rejectSession(UnknownFailure(
@@ -116,8 +136,15 @@ class AuthProvider extends ChangeNotifier {
       } else {
         final tutor = await _tutorRepository.getTutorById(user.uid);
         if (tutor != null) {
-          _tutorAccount = tutor;
-          _resolvedRole = UserRole.tutor;
+          if (door == LoginDoor.staff) {
+            await _rejectSession(const UnknownFailure(
+              'This account is a Tutor, not Staff. '
+              'Go back and choose Tutor.',
+            ));
+          } else {
+            _tutorAccount = tutor;
+            _resolvedRole = UserRole.tutor;
+          }
         }
       }
 
@@ -160,6 +187,8 @@ class AuthProvider extends ChangeNotifier {
     required String password,
   }) async {
     _lastError = null;
+    _selectedDoor = null;
+    _selectedPosition = null;
     try {
       await _tutorRepository.registerTutor(
         name: name,
@@ -173,19 +202,26 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// [position] is what the person picked on the Staff screen; null for
-  /// Tutor sign-in, which has no position list.
+  /// [door] is the login the person used (Staff or Tutor); an account that
+  /// belongs to the other door is rejected. [position] is what the person
+  /// picked on the Staff screen; null for Tutor sign-in and when the router
+  /// sent them to the Staff login without a pick.
   Future<void> signIn({
     required String email,
     required String password,
+    LoginDoor? door,
     StaffPosition? position,
   }) async {
     _lastError = null;
     _errorAfterSignOut = null;
+    _selectedDoor = door;
     _selectedPosition = position;
     try {
       await _authService.signInWithEmail(email: email, password: password);
     } on AppFailure catch (e) {
+      // The sign-in never happened, so nothing will consume these.
+      _selectedDoor = null;
+      _selectedPosition = null;
       _lastError = e;
       notifyListeners();
       rethrow;
