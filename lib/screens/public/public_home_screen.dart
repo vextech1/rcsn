@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_empty_state.dart';
 import '../../widgets/common/app_error_display.dart';
 import '../../widgets/common/app_loading_indicator.dart';
+import '../registrar/timetables/timetable_list_screen.dart';
 import 'public_post_widgets.dart';
 
 /// The Public Space: announcements, calendar, sports, graduations,
@@ -62,7 +63,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
         auth.isUsableStaffSession && auth.resolvedRole!.canModeratePublic;
 
     return DefaultTabController(
-      length: _tabs.length,
+      length: _tabs.length + 1,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('RCSN Public Space'),
@@ -77,7 +78,10 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            tabs: [for (final t in _tabs) Tab(text: t.$1)],
+            tabs: [
+              for (final t in _tabs) Tab(text: t.$1),
+              const Tab(text: 'Timetables'),
+            ],
           ),
         ),
         floatingActionButton: canPost
@@ -91,6 +95,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
           children: [
             for (final t in _tabs)
               _Feed(category: t.$2, refreshToken: _refreshToken),
+            const TimetableListBody(mode: TimetableListMode.everyone),
           ],
         ),
       ),

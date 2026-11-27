@@ -11,6 +11,15 @@ class AppRoutes {
   static const String welcome = '/';
   static const String roleSelect = '/role-select';
 
+  // Timetables and calendars. The Registrar edits; everyone else reads.
+  static const String registrarTimetables = '/registrar/timetables';
+  static const String registrarTimetableEditPattern = '/registrar/timetables/:id';
+  static String registrarTimetableEdit(String id) => '/registrar/timetables/$id';
+  static const String timetableViewPattern = '/timetable/:id';
+  static String timetableView(String id) => '/timetable/$id';
+  static const String studentTimetables = '/student/timetables';
+  static const String tutorTimetables = '/tutor/timetables';
+
   // Public space (no login needed to read; staff and tutors can post)
   static const String publicHome = '/public';
   static const String publicPost = '/public/post';

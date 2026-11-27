@@ -71,6 +71,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'tutor_assignments/tutor2_s1'), { tutorId: 'tutor2', subjectId: 's1' });
     await setDoc(doc(db, 'public_posts/pub1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'published', createdAt: new Date() });
     await setDoc(doc(db, 'public_posts/pend1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'pending', createdAt: new Date() });
+    await setDoc(doc(db, 'timetables/tt_draft'), { ...ttBase('registrar1'), status: 'draft', createdAt: new Date(), updatedAt: new Date() });
+    await setDoc(doc(db, 'timetables/tt_pub'), { ...ttBase('registrar1'), status: 'published', createdAt: new Date(), updatedAt: new Date() });
     await setDoc(doc(db, 'subjects/s1'), subject);
     await setDoc(doc(db, 'content_types/ct1'), { name: 'Notes' });
     await setDoc(doc(db, 'content_items/existing1'), {
@@ -111,6 +113,34 @@ const newPost = (authorId, authorName, authorRole, status, extra = {}) => ({
   ...basePost(authorId, authorName, authorRole),
   status,
   createdAt: serverTimestamp(),
+  ...extra,
+});
+
+const ttBase = (uid) => ({
+  title: 'Class Timetable',
+  type: 'class',
+  audience: 'students',
+  status: 'draft',
+  rows: 2,
+  cols: 2,
+  colWidths: [120, 120],
+  cells: { r0c0: { t: 'Time', B: true } },
+  footnotes: [],
+  createdBy: uid,
+  updatedBy: uid,
+});
+
+const newTimetable = (uid, extra = {}) => ({
+  ...ttBase(uid),
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...extra,
+});
+
+const ttEdit = (uid, extra = {}) => ({
+  title: 'Edited title',
+  updatedAt: serverTimestamp(),
+  updatedBy: uid,
   ...extra,
 });
 
@@ -602,5 +632,78 @@ describe('public space (public_posts)', () => {
     await assertSucceeds(deleteDoc(doc(as('registrar1'), 'public_posts/pub1')));
     await assertFails(deleteDoc(doc(as('tutor1'), 'public_posts/pend1')));
     await assertFails(deleteDoc(doc(anon(), 'public_posts/pend1')));
+  });
+});
+
+describe('timetables (Registrar builds, everyone reads published)', () => {
+  const publishedQuery = (db) =>
+    query(collection(db, 'timetables'), where('status', '==', 'published'));
+
+  it('anyone can read a published timetable, signed in or not', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'timetables/tt_pub')));
+    await assertSucceeds(getDocs(publishedQuery(anon())));
+    await assertSucceeds(getDoc(doc(as('tutor1'), 'timetables/tt_pub')));
+  });
+
+  it('drafts are hidden from the public, tutors and the bursar', async () => {
+    await assertFails(getDoc(doc(anon(), 'timetables/tt_draft')));
+    await assertFails(getDocs(collection(anon(), 'timetables')));
+    await assertFails(getDoc(doc(as('tutor1'), 'timetables/tt_draft')));
+    await assertFails(getDoc(doc(as('bursar1'), 'timetables/tt_draft')));
+  });
+
+  it('the registrar, principal and deputy can read drafts', async () => {
+    await assertSucceeds(getDoc(doc(as('registrar1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDocs(collection(as('registrar1'), 'timetables')));
+  });
+
+  it('only the registrar can create a timetable', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'timetables/new1'), newTimetable('registrar1')));
+    await assertFails(setDoc(doc(as('principal1'), 'timetables/new2'), newTimetable('principal1')));
+    await assertFails(setDoc(doc(as('deputy1'), 'timetables/new3'), newTimetable('deputy1')));
+    await assertFails(setDoc(doc(as('bursar1'), 'timetables/new4'), newTimetable('bursar1')));
+    await assertFails(setDoc(doc(as('tutor1'), 'timetables/new5'), newTimetable('tutor1')));
+    await assertFails(setDoc(doc(as('registrar2'), 'timetables/new6'), newTimetable('registrar2')));
+    await assertFails(setDoc(doc(anon(), 'timetables/new7'), newTimetable('registrar1')));
+  });
+
+  it('a timetable must be well-formed', async () => {
+    const db = as('registrar1');
+    const bad = (extra) => setDoc(doc(db, 'timetables/bad'), newTimetable('registrar1', extra));
+    await assertFails(bad({ title: 'Hi' }));
+    await assertFails(bad({ type: 'weird' }));
+    await assertFails(bad({ audience: 'nobody' }));
+    await assertFails(bad({ rows: 0 }));
+    await assertFails(bad({ rows: 61 }));
+    await assertFails(bad({ cols: 21, colWidths: new Array(21).fill(100) }));
+    await assertFails(bad({ colWidths: [120] }));
+    await assertFails(bad({ extra: 1 }));
+    await assertFails(bad({ createdBy: 'someone-else' }));
+    await assertFails(bad({ createdAt: new Date(0) }));
+    await assertFails(bad({ footnotes: new Array(13).fill('x') }));
+    await assertSucceeds(bad({ subtitle: 'Year 1', academicYear: '2026/27', programType: 'certificateNursing', year: 1, semester: 2 }));
+  });
+
+  it('the registrar can edit, publish and delete; nobody else can', async () => {
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'timetables/tt_draft'), ttEdit('registrar1')));
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'timetables/tt_draft'), ttEdit('registrar1', { status: 'published', publishedAt: serverTimestamp() })));
+    await assertFails(updateDoc(doc(as('principal1'), 'timetables/tt_pub'), ttEdit('principal1')));
+    await assertFails(updateDoc(doc(as('deputy1'), 'timetables/tt_pub'), ttEdit('deputy1')));
+    await assertFails(updateDoc(doc(as('registrar2'), 'timetables/tt_pub'), ttEdit('registrar2')));
+    await assertFails(updateDoc(doc(as('tutor1'), 'timetables/tt_pub'), ttEdit('tutor1')));
+    await assertFails(updateDoc(doc(anon(), 'timetables/tt_pub'), ttEdit('registrar1')));
+    await assertSucceeds(deleteDoc(doc(as('registrar1'), 'timetables/tt_draft')));
+    await assertFails(deleteDoc(doc(as('principal1'), 'timetables/tt_pub')));
+    await assertFails(deleteDoc(doc(anon(), 'timetables/tt_pub')));
+  });
+
+  it('edits cannot rewrite who created it or when, or spoof the editor', async () => {
+    const db = as('registrar1');
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { createdBy: 'principal1' })));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('principal1')));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { updatedAt: new Date(0) })));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { rows: 99 })));
   });
 });

@@ -178,3 +178,42 @@ Blaze). Everything below is designed around that:
 - Payment gateway or mobile-money integration.
 - iOS build (only the Android platform folder exists).
 - Push notifications for fee events.
+
+## 7. Registrar: timetables and calendars
+
+The Academic Registrar owns all academics, so every timetable and calendar is built
+by him in a spreadsheet-style editor and then published for others to read.
+
+**Access.** The Registrar creates, edits, publishes, unpublishes and deletes, with no
+Principal approval. The Principal and Deputy Principal can read everything including
+drafts but not change it (view only is the default for the Principal across the
+academic areas). Students, tutors and the public read published timetables;
+`audience` (everyone / students / staff and tutors) decides where one is listed.
+
+**Multi-device, not phone-first.** One Flutter UI for phone, tablet, desktop and web:
+a scrollable grid with spreadsheet column letters and row numbers, a toolbar, touch
+and mouse selection, and keyboard shortcuts (arrows, Shift to extend, Delete, Enter,
+Ctrl+Z/Y/S/B/I). A web build on Firebase Hosting (`school-msa.web.app`) is the
+comfortable way to edit on a laptop. It needs the web app registered in Firebase and
+the other platforms' config moved to `school-msa`.
+
+**Editor.** Start from a template (class timetable, exam timetable, semester
+calendar, school calendar, blank) or duplicate an old one. Boxes: text, fill and text
+colour, bold, italic, size, alignment, clear formatting. Rows and columns: insert,
+delete, resize. Plus title, subtitle, academic year, type, audience, optional
+program/year/semester, footnotes, undo/redo, draft and publish.
+
+**Build order.**
+1. Core (this step): model, rules and tests, templates, editor, viewer, lists, entry
+   points for the Registrar, Principal, students, tutors and the public.
+2. PDF export and print, merged boxes, subject and tutor pickers, colour legend.
+3. Key dates and month calendar feeding the public calendar; tutor double-booking
+   warning.
+4. Needs Blaze: push alerts and version history. School logo on printouts via the
+   Cloudflare store.
+
+**Still to do (Phase 2 clean-up).** Narrow the existing structure, assignment,
+content-type and student writes to the Registrar and give the Principal view-only
+versions of those screens, keeping status override, staff management and public-post
+moderation.
+

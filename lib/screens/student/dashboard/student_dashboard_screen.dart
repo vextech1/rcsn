@@ -137,6 +137,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         title: Text('Hi, ${student.name.split(' ').first}'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.calendar_month),
+            tooltip: 'Timetables',
+            onPressed: () => context.push(AppRoutes.studentTimetables),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
             onPressed: () =>

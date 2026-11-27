@@ -298,6 +298,72 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
+    // timetables — class and exam timetables, school and semester calendars
+    // -------------------------------------------------------------------
+    //
+    // Built by the Academic Registrar in a spreadsheet-style editor. One
+    // document holds the whole grid (title, boxes, footnotes), so a save is
+    // one atomic write. Only the Registrar creates, edits, publishes and
+    // deletes. The Principal and Deputy Principal can read everything,
+    // drafts included, but not change it. Everyone else (students, tutors,
+    // the public) reads published timetables. `audience` only decides where
+    // a timetable is LISTED in the app; any published one is readable by
+    // anyone holding the app's public key until students get real sessions
+    // (Phase 5).
+
+    match /timetables/{timetableId} {
+      function validTimetable(d) {
+        return d.keys().hasAll(
+               ['title', 'type', 'audience', 'status', 'rows', 'cols',
+                'colWidths', 'cells', 'footnotes', 'createdBy', 'createdAt',
+                'updatedAt', 'updatedBy'])
+          && d.keys().hasOnly(
+               ['title', 'type', 'audience', 'status', 'rows', 'cols',
+                'colWidths', 'cells', 'footnotes', 'createdBy', 'createdAt',
+                'updatedAt', 'updatedBy', 'subtitle', 'academicYear',
+                'programType', 'year', 'semester', 'publishedAt'])
+          && d.title is string && d.title.size() >= 3 && d.title.size() <= 120
+          && d.type in ['class', 'exam', 'calendar', 'semester_calendar', 'custom']
+          && d.audience in ['everyone', 'students', 'staff']
+          && d.status in ['draft', 'published']
+          && d.rows is int && d.rows >= 1 && d.rows <= 60
+          && d.cols is int && d.cols >= 1 && d.cols <= 20
+          && d.colWidths is list && d.colWidths.size() == d.cols
+          && d.cells is map
+          && d.footnotes is list && d.footnotes.size() <= 12
+          && (!('subtitle' in d)
+              || (d.subtitle is string && d.subtitle.size() <= 200))
+          && (!('academicYear' in d)
+              || (d.academicYear is string && d.academicYear.size() <= 20))
+          && (!('programType' in d) || d.programType is string)
+          && (!('year' in d) || (d.year is int && d.year >= 0 && d.year <= 3))
+          && (!('semester' in d)
+              || (d.semester is int && d.semester >= 0 && d.semester <= 2))
+          && (!('publishedAt' in d) || d.publishedAt is timestamp);
+      }
+
+      allow read: if resource.data.status == 'published'
+        || isRegistrar()
+        || isPrincipalLevel();
+
+      allow create: if isRegistrar()
+        && validTimetable(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isRegistrar()
+        && validTimetable(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow delete: if isRegistrar();
+    }
+
+    // -------------------------------------------------------------------
     // admins — RETIRED. Replaced by `staff`. Locked entirely; the legacy
     // document is migrated by bootstrap-principal.js --from-admin.
     // -------------------------------------------------------------------
