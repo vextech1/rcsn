@@ -48,6 +48,42 @@ const Map<ProgramType, Map<(int, int), List<CourseUnit>>> kCourseCatalogue = {
       CourseUnit('CN 314', 'Practicals'),
     ],
   },
+
+  // Certificate Midwifery: the same year-semester-paper coding, prefix CM.
+  // The papers shared with Certificate Nursing carry the same titles. The
+  // practical in every semester is listed by its code alone ("Practicals").
+  ProgramType.certificateMidwifery: {
+    (1, 1): [
+      CourseUnit('CM 111', 'Anatomy and Physiology I and First Aid'),
+      CourseUnit('CM 112', 'Foundations of Nursing I and Computer'),
+      CourseUnit('CM 113', 'Personal and Community Health and Microbiology'),
+      CourseUnit('CM 114', 'Practicals'),
+    ],
+    (1, 2): [
+      CourseUnit('CM 121', 'Anatomy and Physiology II'),
+      CourseUnit('CM 122', 'Foundations of Nursing II, Sociology and Psychology'),
+      CourseUnit('CM 123', 'Primary Healthcare'),
+      CourseUnit('CM 124', 'Practicals'),
+    ],
+    (2, 1): [
+      CourseUnit('CM 211', 'Obstetric Anatomy'),
+      CourseUnit('CM 212', 'Midwifery I and Pharmacology'),
+      CourseUnit('CM 213', 'Paediatric Nursing I and Palliative Care'),
+      CourseUnit('CM 214', 'Practicals'),
+    ],
+    (2, 2): [
+      CourseUnit('CM 221', 'Midwifery II and Tropical Medicine'),
+      CourseUnit('CM 222', 'Paediatric Nursing II and Pharmacology II'),
+      CourseUnit('CM 223', 'Community Health and Occupational Health'),
+      CourseUnit('CM 224', 'Practicals'),
+    ],
+    (3, 1): [
+      CourseUnit('CM 311', 'Gynaecology and Reproductive Health'),
+      CourseUnit('CM 312', 'Mental Health, Guidance and Counselling'),
+      CourseUnit('CM 313', 'Health Service Management and Entrepreneurship'),
+      CourseUnit('CM 314', 'Practicals'),
+    ],
+  },
 };
 
 List<CourseUnit> standardUnits(ProgramType programType, int year, int semester) =>
