@@ -19,6 +19,7 @@ import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
+import '../../data/models/student_fee.dart';
 import '../../screens/student/fees/student_fees_screen.dart';
 import '../../screens/bursar/detail/bursar_fee_detail_screen.dart';
 import '../../screens/bursar/dashboard/bursar_dashboard_screen.dart';
@@ -151,7 +152,7 @@ GoRouter buildAppRouter({
         path: AppRoutes.bursarAdd,
         builder: (_, state) {
           final extra = state.extra;
-          return BursarAddFeeScreen(initialNsin: extra is String ? extra : null);
+          return BursarAddFeeScreen(from: extra is StudentFee ? extra : null);
         },
       ),
       GoRoute(
@@ -183,6 +184,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.studentSearch, builder: (_, __) => const StudentSearchScreen()),
       GoRoute(path: AppRoutes.studentDashboard, builder: (_, __) => const StudentDashboardScreen()),
       GoRoute(path: AppRoutes.studentSubject, builder: (_, __) => const StudentSubjectScreen()),
+      GoRoute(path: AppRoutes.feeLookup, builder: (_, __) => const StudentFeesScreen(withoutNsin: true)),
       GoRoute(path: AppRoutes.studentFees, builder: (_, __) => const StudentFeesScreen()),
       GoRoute(path: AppRoutes.studentSettings, builder: (_, __) => const StudentSettingsScreen()),
       GoRoute(path: AppRoutes.studentAccountInactive, builder: (_, __) => const StudentAccountInactiveScreen()),

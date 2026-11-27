@@ -57,6 +57,8 @@ class AppRoutes {
   static const String studentSearch = '/student/search';
   static const String studentDashboard = '/student/dashboard';
   static const String studentSubject = '/student/subject';
+  // Outside /student: for new students who have no NSIN to sign in with.
+  static const String feeLookup = '/fee-lookup';
   static const String studentFees = '/student/fees';
   static const String studentSettings = '/student/settings';
   static const String studentAccountInactive = '/student/account-inactive';
