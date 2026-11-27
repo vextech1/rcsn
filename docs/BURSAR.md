@@ -17,7 +17,8 @@ Status: Not paid, Balance due, Cleared (balance zero or less).
 entered by the Bursar.
 `student_bio/{student number key, or payment code}`: `dateOfBirth`,
 `district`, `village`, `primarySchool`, `secondarySchool`, entered by the
-Academic Registrar (**Student Bio Data**).
+Academic Registrar (**Students**, then a student's menu, **Bio data**; for a student with no
+number yet, search the payment code).
 
 `.../payments/{id}`: `amount`, `method`, `reference`, `recordedBy`, `createdAt`.
 
