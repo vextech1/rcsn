@@ -52,6 +52,40 @@ service cloud.firestore {
       return isPrincipalLevel() || isRegistrar();
     }
 
+    /// True once the school's Principal has registered (the `system/setup`
+    /// marker exists). Until then NOBODY else may register anywhere: the
+    /// tutor rules below require this.
+    function setupDone() {
+      return exists(/databases/$(database)/documents/system/setup);
+    }
+
+    /// The very first Principal registering themselves from the app.
+    /// Allowed only while no setup marker exists, only for the caller's own
+    /// uid, and only as the same atomic batch that creates the marker
+    /// (existsAfter/getAfter), so a Principal record can never exist
+    /// without the marker. Once the marker exists this is false forever.
+    function isFirstPrincipalCreate(staffId) {
+      return request.auth != null
+        && request.auth.uid == staffId
+        && !setupDone()
+        && existsAfter(/databases/$(database)/documents/system/setup)
+        && getAfter(/databases/$(database)/documents/system/setup)
+             .data.principalUid == staffId
+        && request.resource.data.keys().hasAll(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.matches('.+@.+[.].+')
+        && request.resource.data.role == 'principal'
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdBy == staffId
+        && request.resource.data.createdAt == request.time;
+    }
+
     /// True if the requesting user has an active Tutor account.
     /// The tutor document ID MUST equal the Firebase Auth UID — this is
     /// enforced at creation time (see tutors.create below).
@@ -90,8 +124,9 @@ service cloud.firestore {
     //     a Deputy record is never reactivated, a new one is appointed.
     //   - Nobody can create another principal, change the Principal record,
     //     change their own status, or delete staff.
-    //   - The first Principal is created out-of-band
-    //     (tools/bootstrap-principal.js or by hand in the console).
+    //   - The first Principal registers themselves from the app (see
+    //     isFirstPrincipalCreate and system/setup); nobody else can
+    //     register until then.
     //
     // Suspension is enforced here, live on every request (isStaff() reads
     // status), and by the app signing a suspended user out.
@@ -104,33 +139,34 @@ service cloud.firestore {
         && (request.auth.uid == staffId || isPrincipalLevel());
       allow list: if isPrincipalLevel();
 
-      allow create: if isPrincipalLevel()
-        && request.resource.data.keys().hasAll(
-             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
-        && request.resource.data.keys().hasOnly(
-             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy',
-              'position'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 100
-        && request.resource.data.email is string
-        && request.resource.data.email.matches('.+@.+[.].+')
-        && (
-          request.resource.data.role in ['registrar', 'bursar', 'staffMember']
-          || (request.resource.data.role == 'deputyPrincipal' && isPrincipal())
-        )
-        && (
-          (request.resource.data.role == 'staffMember'
-            && 'position' in request.resource.data
-            && request.resource.data.position is string
-            && request.resource.data.position.size() >= 2
-            && request.resource.data.position.size() <= 60)
-          || (request.resource.data.role != 'staffMember'
-            && !('position' in request.resource.data))
-        )
-        && request.resource.data.status == 'active'
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time;
+      allow create: if isFirstPrincipalCreate(staffId)
+        || (isPrincipalLevel()
+          && request.resource.data.keys().hasAll(
+               ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+          && request.resource.data.keys().hasOnly(
+               ['name', 'email', 'role', 'status', 'createdAt', 'createdBy',
+                'position'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 2
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.email is string
+          && request.resource.data.email.matches('.+@.+[.].+')
+          && (
+            request.resource.data.role in ['registrar', 'bursar', 'staffMember']
+            || (request.resource.data.role == 'deputyPrincipal' && isPrincipal())
+          )
+          && (
+            (request.resource.data.role == 'staffMember'
+              && 'position' in request.resource.data
+              && request.resource.data.position is string
+              && request.resource.data.position.size() >= 2
+              && request.resource.data.position.size() <= 60)
+            || (request.resource.data.role != 'staffMember'
+              && !('position' in request.resource.data))
+          )
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time);
 
       // Suspend / reactivate: Principal or Deputy Principal, never
       // themselves, never the Principal record, and only the status stamp
@@ -269,7 +305,7 @@ service cloud.firestore {
 
     // -------------------------------------------------------------------
     // admins — RETIRED. Replaced by `staff`. Locked entirely; the legacy
-    // document is migrated by bootstrap-principal.js --from-admin.
+    // document is no longer used.
     // -------------------------------------------------------------------
 
     match /admins/{adminId} {
@@ -290,6 +326,7 @@ service cloud.firestore {
       // a different UID. The incoming document must set status to
       // 'active' — no self-creating with 'suspended' or 'terminated'.
       allow create: if request.auth != null
+        && setupDone()
         && request.auth.uid == tutorId
         && request.resource.data.status == 'active'
         && request.resource.data.name is string
@@ -519,6 +556,34 @@ service cloud.firestore {
       // yet; this rule allows it so the capability exists when the
       // UI catches up, but Admin should be careful.
       allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // system/setup — "the school has a Principal" marker
+    // -------------------------------------------------------------------
+    //
+    // Anyone may read it (the app checks it at launch, before sign-in) but
+    // nobody can list the collection. It is created exactly once, by the
+    // first Principal, in the same batch as their own staff record; after
+    // that it can never be changed or deleted from a client.
+
+    match /system/{docId} {
+      allow get: if docId == 'setup';
+      allow list: if false;
+
+      allow create: if docId == 'setup'
+        && request.auth != null
+        && request.resource.data.keys().hasAll(['principalUid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['principalUid', 'createdAt'])
+        && request.resource.data.principalUid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && existsAfter(
+             /databases/$(database)/documents/staff/$(request.auth.uid))
+        && getAfter(
+             /databases/$(database)/documents/staff/$(request.auth.uid))
+             .data.role == 'principal';
+
+      allow update, delete: if false;
     }
 
     // -------------------------------------------------------------------

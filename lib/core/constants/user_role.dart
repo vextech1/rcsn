@@ -5,8 +5,8 @@
 /// it is serving.
 enum UserRole {
   /// The one school Principal. Creates and suspends staff accounts and has
-  /// oversight of everything else. Created by the bootstrap script, never
-  /// in-app.
+  /// oversight of everything else. Registers themselves on first run;
+  /// nobody else can register before then.
   principal,
 
   /// The one Deputy Principal. Has the Principal's responsibilities (staff

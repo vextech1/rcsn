@@ -11,6 +11,11 @@ class AppRoutes {
   static const String welcome = '/';
   static const String roleSelect = '/role-select';
 
+  // First-run setup: until the Principal has registered, these are the only
+  // routes the router allows.
+  static const String setupCheck = '/setup/check';
+  static const String setup = '/setup';
+
   // Public space (no login needed to read; staff and tutors can post)
   static const String publicHome = '/public';
   static const String publicPost = '/public/post';

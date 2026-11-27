@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/setup_provider.dart';
 import 'providers/student_provider.dart';
 import 'providers/structure_provider.dart';
 import 'providers/tutor_provider.dart';
@@ -24,6 +25,7 @@ class RcsnApp extends StatelessWidget {
         // `refreshListenable` and `redirect` guard read directly, so
         // they're created here rather than lower in the tree.
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => SetupProvider()),
         ChangeNotifierProvider(create: (_) => StudentProvider()),
         ChangeNotifierProvider(create: (_) => StructureProvider()),
         ChangeNotifierProvider(create: (_) => TutorProvider()),
@@ -37,6 +39,7 @@ class RcsnApp extends StatelessWidget {
           final router = buildAppRouter(
             authProvider: context.read<AuthProvider>(),
             studentProvider: context.read<StudentProvider>(),
+            setupProvider: context.read<SetupProvider>(),
           );
 
           return MaterialApp.router(
