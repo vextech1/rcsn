@@ -40,7 +40,7 @@ The single Admin is replaced by three staff roles, plus Tutor and Student.
 - **One `staff` collection.** Doc ID = Firebase Auth uid. Fields: `name`, `email`, `role` (`principal | registrar | bursar`), `status`, `createdAt`, `createdBy`.
 - **Staff accounts are created server-side.** A callable Cloud Function `createStaff` (Principal only) creates the Auth user, writes the `staff` doc, sets a `role` custom claim and sends a password-reset email. Creating an Auth user from the client signs the creator out, so this cannot be done in-app.
 - **Rules check status live.** The custom claim is used for routing and cheap checks. Rules also read the `staff` doc, so suspending a staff member takes effect immediately.
-- **No in-app first-run setup.** A one-time bootstrap script (Admin SDK, run locally) creates the Principal. There is no public creation path, which closes the takeover class of bug.
+- **First-run setup is in the app, and locked.** The first Principal registers themselves; the rules allow it exactly once, through an atomic `system/setup` marker batch (see `docs/PHASE1.md`). This replaced the earlier bootstrap-script design. Nobody else, tutors included, can register before then.
 - **Role select:** Staff, Tutor, Student. The staff login routes to the right dashboard by role.
 - **`UserRole` enum:** `principal, registrar, bursar, tutor, student`. Staff roles share the `staff` collection.
 - **Routes:** `/admin/*` is replaced by `/staff/login`, `/principal/*`, `/registrar/*`, `/bursar/*`.
@@ -68,7 +68,7 @@ Blaze). Everything below is designed around that:
 
 - **Staff management** is done by the Principal's app. The `staff` rules are the
   boundary: Principal-only create (registrar or bursar), status-only updates, no
-  deletes. First Principal is created by hand or by `tools/bootstrap-principal.js`.
+  deletes. The first Principal registers themselves in the app (see `docs/PHASE1.md`).
 - **Fee stubs (Phase 3)**: the admission screen writes the student and a zero-balance
   `student_fees` stub in one batch (rules let the Registrar create only that stub),
   instead of a Cloud Function trigger.

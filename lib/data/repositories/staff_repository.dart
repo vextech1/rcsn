@@ -169,42 +169,20 @@ class StaffRepository {
   /// Principal or Deputy Principal, never themselves, never the Principal
   /// record. The Deputy Principal's record can only be terminated (suspended,
   /// one-way) and only by the Principal.
-  ///
-  /// Pass [targetRole] so that terminating the Deputy Principal also frees
-  /// the Deputy Principal option on the Staff screen. Both writes go in one
-  /// batch so they succeed or fail together.
   Future<void> setStatus({
     required String staffId,
     required StaffStatus status,
-    UserRole? targetRole,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       throw const UnauthorizedActionFailure('Please sign in again.');
     }
-    final stamp = <String, Object>{
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': uid,
-    };
     try {
-      if (targetRole == UserRole.deputyPrincipal &&
-          status == StaffStatus.suspended) {
-        final batch = _firestore.batch();
-        batch.update(_staff.doc(staffId), stamp);
-        batch.set(
-          _firestore
-              .collection('staff_slots')
-              .doc(UserRole.deputyPrincipal.name),
-          {
-            'claimed': false,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-        );
-        await batch.commit();
-      } else {
-        await _staff.doc(staffId).update(stamp);
-      }
+      await _staff.doc(staffId).update({
+        'status': status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': uid,
+      });
     } catch (e) {
       throw _mapWriteError(e);
     }

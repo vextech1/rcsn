@@ -3,10 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'app_routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/setup_provider.dart';
 import '../../providers/student_provider.dart';
 import '../constants/user_role.dart';
 import '../../screens/shared/welcome_screen.dart';
 import '../../screens/shared/role_select_screen.dart';
+import '../../screens/setup/principal_setup_screen.dart';
+import '../../screens/setup/setup_check_screen.dart';
 import '../../data/models/public_post.dart';
 import '../../data/models/staff_position.dart';
 import '../../screens/public/public_home_screen.dart';
@@ -91,13 +94,20 @@ import '../../screens/student/account_inactive/student_account_inactive_screen.d
 GoRouter buildAppRouter({
   required AuthProvider authProvider,
   required StudentProvider studentProvider,
+  required SetupProvider setupProvider,
 }) {
   return GoRouter(
     initialLocation: AppRoutes.welcome,
-    refreshListenable: Listenable.merge([authProvider, studentProvider]),
+    refreshListenable:
+        Listenable.merge([authProvider, studentProvider, setupProvider]),
     redirect: (context, state) =>
-        _guard(context, state, authProvider, studentProvider),
+        _guard(context, state, authProvider, studentProvider, setupProvider),
     routes: [
+      // First-run setup (the only routes reachable before the Principal
+      // has registered).
+      GoRoute(path: AppRoutes.setupCheck, builder: (_, __) => const SetupCheckScreen()),
+      GoRoute(path: AppRoutes.setup, builder: (_, __) => const PrincipalSetupScreen()),
+
       // Shared entry routes — wired to their real screens.
       GoRoute(path: AppRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: AppRoutes.roleSelect, builder: (_, __) => const RoleSelectScreen()),
@@ -224,8 +234,24 @@ String? _guard(
   GoRouterState state,
   AuthProvider auth,
   StudentProvider student,
+  SetupProvider setup,
 ) {
   final path = state.matchedLocation;
+
+  // First-run gate, before anything else: until the Principal has
+  // registered, the app shows nothing but the setup screens. firestore.rules
+  // enforce the same rule server-side.
+  switch (setup.status) {
+    case SetupStatus.checking:
+    case SetupStatus.error:
+      return path == AppRoutes.setupCheck ? null : AppRoutes.setupCheck;
+    case SetupStatus.needsSetup:
+      return path == AppRoutes.setup ? null : AppRoutes.setup;
+    case SetupStatus.ready:
+      if (path == AppRoutes.setup || path == AppRoutes.setupCheck) {
+        return AppRoutes.welcome;
+      }
+  }
 
   final isEntryRoute = path == AppRoutes.welcome || path == AppRoutes.roleSelect;
   // The position list and the login are both "not signed in yet" screens.

@@ -90,8 +90,8 @@ class _PrincipalStaffScreenState extends State<PrincipalStaffScreen> {
     if (terminating) {
       title = 'Terminate ${staff.name}?';
       body = 'They will lose all Deputy Principal access straight away and '
-          'cannot be reinstated. The Deputy Principal option will appear on '
-          'the Staff screen again so you can appoint someone else.';
+          'cannot be reinstated. You can then appoint a new Deputy '
+          'Principal.';
       action = 'Terminate';
     } else if (suspending) {
       title = 'Suspend ${staff.name}?';
@@ -128,7 +128,6 @@ class _PrincipalStaffScreenState extends State<PrincipalStaffScreen> {
       await _repository.setStatus(
         staffId: staff.id,
         status: suspending ? StaffStatus.suspended : StaffStatus.active,
-        targetRole: staff.role,
       );
       _snack(
         terminating
