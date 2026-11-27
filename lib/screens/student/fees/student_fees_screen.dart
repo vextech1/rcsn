@@ -14,11 +14,11 @@ import '../../bursar/fee_status_label.dart';
 /// Bursar holds: name, program and tuition for each semester. Read-only. The
 /// code is deliberately not saved, because students share phones.
 class StudentFeesScreen extends StatefulWidget {
-  /// True for a newly admitted student who has no NSIN yet. Only records with
-  /// no NSIN are shown that way; the rest need an NSIN sign-in.
-  final bool withoutNsin;
+  /// True when opened without signing in: a parent, or a new student with no
+  /// NSIN yet. The school-issued code alone is enough.
+  final bool codeOnly;
 
-  const StudentFeesScreen({super.key, this.withoutNsin = false});
+  const StudentFeesScreen({super.key, this.codeOnly = false});
 
   @override
   State<StudentFeesScreen> createState() => _StudentFeesScreenState();
@@ -45,7 +45,7 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
       });
       return;
     }
-    final nsin = widget.withoutNsin
+    final nsin = widget.codeOnly
         ? null
         : context.read<StudentProvider>().currentStudent?.nsin;
     setState(() {
@@ -55,19 +55,16 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
     });
     try {
       final found = await FeeRepository().findByNumber(_number.text);
-      // A signed-in student sees their own records, including any not yet
-      // linked to an NSIN.
+      // The code alone shows its records. A signed-in student sees only their
+      // own, including any not yet linked to an NSIN.
       final own = found
-          .where((f) => f.nsin.isEmpty || f.nsin == nsin)
+          .where((f) => widget.codeOnly || f.nsin.isEmpty || f.nsin == nsin)
           .toList();
       if (!mounted) return;
       setState(() {
         if (own.isEmpty) {
-          _error = FeeFailure(
-            widget.withoutNsin && found.isNotEmpty
-                ? 'You already have an NSIN. Go back and sign in with it.'
-                : 'Nothing found for that payment code. Check it or ask the '
-                    'Bursar.',
+          _error = const FeeFailure(
+            'Nothing found for that payment code. Check it or ask the Bursar.',
           );
         } else {
           _fees = own;
@@ -84,7 +81,7 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.withoutNsin ? 'Payment code' : 'My fees'),
+        title: Text(widget.codeOnly ? 'Fees' : 'My fees'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
