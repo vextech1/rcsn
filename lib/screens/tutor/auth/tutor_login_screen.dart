@@ -45,6 +45,7 @@ class _TutorLoginScreenState extends State<TutorLoginScreen> {
       await context.read<AuthProvider>().signIn(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            door: LoginDoor.tutor,
           );
       // Same reasoning as TutorRegisterScreen: no manual navigation.
       // The router's redirect guard sends a resolved Tutor session to

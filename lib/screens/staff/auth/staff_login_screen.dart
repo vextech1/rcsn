@@ -59,6 +59,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       await context.read<AuthProvider>().signIn(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            door: LoginDoor.staff,
             position: widget.position,
           );
       // No manual navigation here. The router's redirect guard sends a
