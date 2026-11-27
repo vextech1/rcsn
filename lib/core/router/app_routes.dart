@@ -44,6 +44,7 @@ class AppRoutes {
   // Bursar
   static const String bursarDashboard = '/bursar/dashboard';
   static const String bursarAdd = '/bursar/add';
+  static const String bursarBulk = '/bursar/class-tuition';
   static const String bursarRecord = '/bursar/record';
 
   // Tutor

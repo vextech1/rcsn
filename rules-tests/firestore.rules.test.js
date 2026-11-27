@@ -625,6 +625,23 @@ describe('student fees', () => {
     await assertFails(getDoc(doc(db, 'student_bio/PN12345')));
     await assertFails(getDoc(doc(db, 'fee_attempts/PN12345_2026-01-01')));
   });
+  it('lets the bursar change tuition for a whole class at once', async () => {
+    const db = as('bursar1');
+    const ids = Array.from({ length: 30 }, (_, i) => `CLS${100 + i}`);
+    for (const code of ids) {
+      const batch = writeBatch(db);
+      batch.set(doc(db, `fee_numbers/${code}`), { nsin: '', ...stamp('bursar1') });
+      batch.set(doc(db, `student_fees/${code}_Y1S1`),
+        record({ paymentNumber: code, nsin: '' }));
+      await assertSucceeds(batch.commit());
+    }
+    const bulk = writeBatch(db);
+    for (const code of ids) {
+      bulk.update(doc(db, `student_fees/${code}_Y1S1`),
+        { tuition: 2000, ...stamp('bursar1') });
+    }
+    await assertSucceeds(bulk.commit());
+  });
   it('never deletes', async () => {
     await assertSucceeds(open());
     await assertSucceeds(pay(400, 400));

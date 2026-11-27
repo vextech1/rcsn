@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/utils/fee_export.dart';
 import '../../../core/utils/money.dart';
+import '../../../core/utils/save_file.dart';
 import '../../../core/utils/nsin_validator.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
@@ -53,6 +55,39 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
       barrierDismissible: false,
       builder: (_) => _TuitionDialog(repository: _repository, fee: fee),
     );
+  }
+
+  /// Checks the latest figures, including earlier semesters, before making
+  /// the slip.
+  Future<void> _clearanceSlip() async {
+    final messenger = ScaffoldMessenger.of(context);
+    void say(String text) =>
+        messenger.showSnackBar(SnackBar(content: Text(text)));
+    try {
+      final feeId = widget.feeId;
+      final paymentNumber = feeId.substring(0, feeId.indexOf('_'));
+      final records = await _repository.recordsFor(paymentNumber);
+      if (!mounted) return;
+      final matches = records.where((r) => r.id == feeId);
+      if (matches.isEmpty) {
+        say('This fee record no longer exists.');
+        return;
+      }
+      final fee = matches.first;
+      final owing = owingUpTo(fee, records);
+      if (owing.isNotEmpty) {
+        say('Not cleared. Balance due for ${owing.map((r) => 'Year ${r.year} '
+            'Semester ${r.semester}: ${formatUgx(r.balance)}').join('; ')}');
+        return;
+      }
+      await saveToPhone(
+        context,
+        'clearance-${fee.paymentNumber}-Y${fee.year}S${fee.semester}.pdf',
+        clearancePdf(fee, DateTime.now()),
+      );
+    } on AppFailure catch (e) {
+      say(e.message);
+    }
   }
 
   @override
@@ -132,6 +167,12 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
                 ),
                 child: const Text('Add another semester'),
               ),
+              if (fee.status == FeeStatus.cleared)
+                OutlinedButton.icon(
+                  onPressed: _clearanceSlip,
+                  icon: const Icon(Icons.print),
+                  label: const Text('Save clearance slip (PDF)'),
+                ),
               ],
               const Divider(height: 32),
               Text('Payments', style: Theme.of(context).textTheme.titleMedium),

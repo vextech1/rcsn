@@ -75,6 +75,51 @@ class FeeRepository {
     );
   }
 
+  /// The latest records, straight from the server.
+  Future<List<StudentFee>> recordsFor(String paymentNumber) => _fetch(
+        _fees.where('paymentNumber', isEqualTo: paymentNumber),
+      );
+
+  /// Every record of one class: a programme, year and semester.
+  Future<List<StudentFee>> classRecords(
+    ProgramType programType,
+    int year,
+    int semester,
+  ) =>
+      _fetch(
+        _fees
+            .where('programType', isEqualTo: programType.name)
+            .where('year', isEqualTo: year)
+            .where('semester', isEqualTo: semester),
+      );
+
+  Future<List<StudentFee>> _fetch(Query<Map<String, dynamic>> query) async {
+    try {
+      final found = await query.get(const GetOptions(source: Source.server));
+      return found.docs.map(StudentFee.fromFirestore).toList();
+    } on FirebaseException {
+      throw const FeeFailure(
+        'Could not load the records. Check your connection and try again.',
+      );
+    }
+  }
+
+  /// Sets the same tuition on all of [records]. Payments are not touched.
+  Future<void> setClassTuition(List<StudentFee> records, int tuition) =>
+      _run(() async {
+        // A Firestore batch holds at most 500 writes.
+        for (var start = 0; start < records.length; start += 400) {
+          final batch = _firestore.batch();
+          for (final record in records.skip(start).take(400)) {
+            batch.update(
+              _fees.doc(record.id),
+              {'tuition': tuition, ..._stamp()},
+            );
+          }
+          await batch.commit();
+        }
+      });
+
   /// Opens a student's record for a semester, with nothing paid yet.
   Future<String> create({
     required String paymentNumber,

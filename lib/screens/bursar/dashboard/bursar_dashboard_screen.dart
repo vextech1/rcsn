@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/utils/fee_export.dart';
 import '../../../core/utils/money.dart';
+import '../../../core/utils/save_file.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../core/errors/app_failure.dart';
@@ -33,7 +36,13 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.readOnly ? 'Student fees' : 'Bursar'),
-        actions: widget.readOnly ? null : [
+        actions: [
+          if (!widget.readOnly) ...[
+          IconButton(
+            icon: const Icon(Icons.groups),
+            tooltip: 'Class tuition',
+            onPressed: () => context.push(AppRoutes.bursarBulk),
+          ),
           IconButton(
             icon: const Icon(Icons.campaign),
             tooltip: 'Public Space',
@@ -47,6 +56,7 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
               if (context.mounted) context.go(AppRoutes.roleSelect);
             },
           ),
+          ],
         ],
       ),
       floatingActionButton: widget.readOnly ? null : FloatingActionButton.extended(
@@ -121,6 +131,18 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
                   'Owed ${formatUgx(owed)}',
                   textAlign: TextAlign.center,
                 ),
+              ),
+              // Exports what the search and filter show.
+              TextButton.icon(
+                onPressed: shown.isEmpty
+                    ? null
+                    : () => saveToPhone(
+                          context,
+                          'fees-${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv',
+                          feesCsv(shown),
+                        ),
+                icon: const Icon(Icons.download),
+                label: const Text('Export CSV'),
               ),
               const Divider(),
               Expanded(

@@ -20,6 +20,7 @@ import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
 import '../../screens/registrar/bio/registrar_bio_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
+import '../../screens/bursar/bulk/bursar_bulk_tuition_screen.dart';
 import '../../data/models/student_fee.dart';
 import '../../screens/student/fees/student_fees_screen.dart';
 import '../../screens/bursar/detail/bursar_fee_detail_screen.dart';
@@ -160,6 +161,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarBio, builder: (_, __) => const RegistrarBioScreen()),
 
       // Bursar
+      GoRoute(path: AppRoutes.bursarBulk, builder: (_, __) => const BursarBulkTuitionScreen()),
       GoRoute(path: AppRoutes.bursarDashboard, builder: (_, __) => const BursarDashboardScreen()),
       GoRoute(
         path: AppRoutes.bursarAdd,

@@ -55,7 +55,13 @@ Worker. Fee viewing works only after the Worker has been deployed from `main`.
    history. **Built.**
 2. Verified fee view (see above). **Built.**
 3. Principal and Deputy Principal read-only view (**Student Fees**). **Built.**
-4. Later: bulk tuition per class, CSV export, printable clearance.
+4. **Built:**
+   - **Class tuition** (Bursar): one amount for every record of a programme,
+     year and semester. It changes existing records only.
+   - **Export CSV**: the records currently shown, saved to the phone
+     (Bursar, Principal, Deputy).
+   - **Clearance slip** (Bursar): a PDF to print, sign and stamp. Offered when
+     the semester and all earlier recorded semesters are paid.
 
 ## Known gaps
 
