@@ -32,7 +32,7 @@ import 'tutor_account.dart' show AccountStatus;
 /// (e.g. "JAN21/U028/CCN/002"), NOT pre-parsed into separate intake/
 /// course/sequence fields. This is deliberate, not an oversight: the
 /// course-code segment is still unconfirmed for five of the six tracks
-/// (see NsinValidator's doc comments) — the person providing this format
+/// (see StudentNumber's doc comments) — the person providing this format
 /// info explicitly said "we will validate everything once exact
 /// information is confirmed." Splitting the NSIN into structured fields
 /// now would mean guessing at a parsing rule that might not hold for

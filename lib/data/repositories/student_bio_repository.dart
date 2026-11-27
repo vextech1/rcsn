@@ -21,9 +21,10 @@ class StudentBioRepository {
     'secondarySchool',
   ];
 
-  /// [key] is an NSIN, or the payment code of a student without one.
+  /// [key] is `StudentNumber.bioKey` of the student number, or the payment
+  /// code of a student without one.
   DocumentReference<Map<String, dynamic>> _doc(String key) =>
-      _firestore.collection('student_bio').doc(key.replaceAll('/', '_'));
+      _firestore.collection('student_bio').doc(key);
 
   /// Blank values if nothing has been recorded.
   Future<Map<String, String>> load(String key) async {

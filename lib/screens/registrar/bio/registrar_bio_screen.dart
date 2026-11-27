@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/errors/app_failure.dart';
-import '../../../core/utils/nsin_validator.dart';
+import '../../../core/utils/student_number.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/student_bio_repository.dart';
 import '../../../widgets/common/app_error_display.dart';
@@ -32,7 +32,10 @@ class _RegistrarBioScreenState extends State<RegistrarBioScreen> {
     for (final f in StudentBioRepository.fields) f: TextEditingController(),
   };
 
-  /// The student whose form is open; null until one is opened.
+  /// False when the student is identified by payment code.
+  bool _byNumber = true;
+
+  /// The bio record whose form is open; null until one is opened.
   String? _loaded;
   String? _note;
   AppFailure? _error;
@@ -63,20 +66,19 @@ class _RegistrarBioScreenState extends State<RegistrarBioScreen> {
   }
 
   Future<void> _open() async {
-    // An NSIN has slashes; a payment code never does.
-    final isNsin = _key.text.contains('/');
-    final problem = isNsin
-        ? NsinValidator.errorMessage(_key.text)
+    // Not held to the current format: older students keep older numbers.
+    final problem = _byNumber
+        ? StudentNumber.basicError(_key.text)
         : StudentFee.numberError(_key.text);
     if (problem != null) {
       setState(() {
         _loaded = null;
-        _error = const FeeFailure('Enter a valid NSIN or payment code.');
+        _error = UnknownFailure(problem);
       });
       return;
     }
-    final key = isNsin
-        ? NsinValidator.normalize(_key.text)
+    final key = _byNumber
+        ? StudentNumber.bioKey(StudentNumber.normalize(_key.text))
         : StudentFee.normalizeNumber(_key.text);
     await _run(() async {
       final values = await _repository.load(key);
@@ -110,11 +112,28 @@ class _RegistrarBioScreenState extends State<RegistrarBioScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('Student number')),
+                  ButtonSegment(value: false, label: Text('Payment code')),
+                ],
+                selected: {_byNumber},
+                onSelectionChanged: _busy
+                    ? null
+                    : (choice) => setState(() {
+                          _byNumber = choice.first;
+                          _loaded = null;
+                          _note = null;
+                          _error = null;
+                        }),
+              ),
               TextFormField(
                 controller: _key,
                 enabled: !_busy,
-                decoration: const InputDecoration(
-                  labelText: 'NSIN, or payment code if none yet',
+                decoration: InputDecoration(
+                  labelText: _byNumber
+                      ? 'Student number'
+                      : 'Payment code (if no student number yet)',
                 ),
                 // Editing the number closes the form, so details cannot be
                 // saved against the wrong student.
@@ -130,7 +149,7 @@ class _RegistrarBioScreenState extends State<RegistrarBioScreen> {
                 label: const Text('Open'),
               ),
               if (_loaded != null) ...[
-                Text('Bio data for $_loaded'),
+                Text('Bio data for ${StudentNumber.normalize(_key.text)}'),
                 DateField(
                   controller: _fields['dateOfBirth']!,
                   label: _labels['dateOfBirth']!,

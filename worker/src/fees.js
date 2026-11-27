@@ -136,7 +136,9 @@ async function verify(env, body, records, code) {
   // The Registrar may have filed bio data under the NSIN or the payment code.
   const bio = {
     ...(await read(env, `student_bio/${code}`)),
-    ...(nsin ? await read(env, `student_bio/${nsin.replaceAll('/', '_')}`) : null),
+    // Same id as StudentNumber.bioKey in the app.
+    ...(nsin ? await read(env, `student_bio/${
+      nsin.includes('/') ? nsin.replaceAll('/', '_') : `N_${nsin}`}`) : null),
   };
   const stored = {
     dateOfBirth: bio.dateOfBirth,

@@ -18,7 +18,7 @@ Uint8List feesCsv(List<StudentFee> fees) {
   }
 
   final lines = [
-    'Name,Payment code,NSIN,Programme,Year,Semester,Tuition,Paid,Balance,Status',
+    'Name,Payment code,Student number,Programme,Year,Semester,Tuition,Paid,Balance,Status',
     for (final f in fees)
       [
         text(f.name),
@@ -70,7 +70,7 @@ Uint8List clearancePdf(StudentFee fee, DateTime issued) {
   line('Rakai Community School of Nursing', size: 18, bold: true, gap: 30);
   line('Tuition Clearance Slip', size: 14, bold: true, gap: 40);
   line('Name: ${fee.name}');
-  line('NSIN: ${fee.nsin.isEmpty ? 'Not yet given' : fee.nsin}');
+  line('Student number: ${fee.nsin.isEmpty ? 'Not yet given' : fee.nsin}');
   line('Payment code: ${fee.paymentNumber}');
   // The built-in PDF font has no long dash.
   line('Programme: ${_programme(fee).replaceAll('–', '-')}');

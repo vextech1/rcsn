@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/repositories/student_number_repository.dart';
 import '../data/repositories/student_repository.dart';
 import '../data/models/student_record.dart';
 import '../data/models/tutor_account.dart' show AccountStatus;
-import '../core/utils/nsin_validator.dart';
+import '../core/utils/student_number.dart';
 import '../core/errors/app_failure.dart';
 
 /// Holds the current Student "session" — which is deliberately NOT the
@@ -103,7 +104,7 @@ class StudentProvider extends ChangeNotifier {
 
   /// The Section 2.3 entry point. Validates FORMAT locally first (fast,
   /// no network call for an obviously malformed entry — see
-  /// NsinValidator's own doc comments on why format and existence are
+  /// StudentNumber's own doc comments on why format and existence are
   /// checked separately), then performs the actual existence lookup
   /// against Firestore via StudentRepository. An NSIN that doesn't
   /// resolve to any record — because Admin is the only source of valid
@@ -115,7 +116,7 @@ class StudentProvider extends ChangeNotifier {
   Future<void> searchByNsin(String rawInput) async {
     _lastError = null;
 
-    final formatError = NsinValidator.errorMessage(rawInput);
+    final formatError = StudentNumber.basicError(rawInput);
     if (formatError != null) {
       _lastError = UnknownFailure(formatError);
       notifyListeners();
@@ -126,13 +127,16 @@ class StudentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // The Registrar's format, if one is set.
+      final mismatch = await StudentNumberRepository().check(rawInput);
+      if (mismatch != null) throw UnknownFailure(mismatch);
       final record = await _repository.findByNsin(rawInput);
       if (record == null) {
         _lastError = const NsinNotFoundFailure();
         _currentStudent = null;
       } else {
         _currentStudent = record;
-        await _persistNsin(NsinValidator.normalize(rawInput));
+        await _persistNsin(StudentNumber.normalize(rawInput));
       }
     } catch (e) {
       _lastError = e is AppFailure ? e : const UnknownFailure();

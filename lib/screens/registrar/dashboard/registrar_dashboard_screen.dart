@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/user_role.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/common/dashboard_tile.dart';
@@ -60,6 +61,14 @@ class RegistrarDashboardScreen extends StatelessWidget {
               label: 'Student Bio Data',
               onTap: () => context.push(AppRoutes.registrarBio),
             ),
+            // Only the Registrar may change it; the rules agree.
+            if (context.watch<AuthProvider>().resolvedRole ==
+                UserRole.registrar)
+              DashboardTile(
+                icon: Icons.pin,
+                label: 'Student Number Format',
+                onTap: () => context.push(AppRoutes.registrarStudentNumber),
+              ),
             DashboardTile(
               icon: Icons.category,
               label: 'Content Types',

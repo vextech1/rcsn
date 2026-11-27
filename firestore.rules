@@ -115,7 +115,7 @@ service cloud.firestore {
     function isNsinOrEmpty(nsin) {
       return nsin is string
         && (nsin == ''
-            || nsin.matches('[A-Z]{3}[0-9]{2}/U028/[A-Z]{2,4}/[0-9]{2,4}'));
+            || nsin.matches('[A-Z0-9][A-Z0-9/.\\-]{2,29}'));
     }
 
     function isFeeStamp() {
@@ -784,6 +784,19 @@ service cloud.firestore {
         && request.resource.data.dateOfBirth.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
         && isFeeStamp();
       allow delete: if false;
+    }
+
+    // Student number formats, set by the Academic Registrar. The app checks
+    // numbers against them; public, because students check before signing in.
+    match /settings/studentNumber {
+      allow get: if true;
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(['formats', 'updatedBy', 'updatedAt'])
+        && request.resource.data.formats is list
+        && request.resource.data.formats.size() >= 1
+        && request.resource.data.formats.size() <= 5
+        && isFeeStamp();
+      allow delete: if isRegistrar();
     }
 
     // fee_attempts (the Worker's guess counter) has no rule: apps are denied.

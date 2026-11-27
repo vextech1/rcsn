@@ -9,13 +9,13 @@ it; the app takes no payments.
 `name`, `programType`, `year`, `semester`, `tuition`, `paid`, `lastPaymentId`,
 `updatedBy`, `updatedAt`. Amounts are whole shillings. Balance = tuition - paid.
 `fee_numbers/{paymentNumber}`: the owning `nsin`. Empty for a new student;
-filled in once with **Add NSIN**.
+filled in once with **Add student number**.
 Payment numbers: 4 to 10 letters or digits, one per student.
 Status: Not paid, Balance due, Cleared (balance zero or less).
 
 `fee_guardians/{paymentNumber}`: one or two parent or guardian `names`,
 entered by the Bursar.
-`student_bio/{NSIN with _ for /, or payment code}`: `dateOfBirth`,
+`student_bio/{student number key, or payment code}`: `dateOfBirth`,
 `district`, `village`, `primarySchool`, `secondarySchool`, entered by the
 Academic Registrar (**Student Bio Data**).
 
@@ -31,14 +31,24 @@ Academic Registrar (**Student Bio Data**).
 - Payments and records are never deleted or edited. Fix mistakes with a
   correction entry.
 
+## Student numbers
+
+The Academic Registrar sets one to five formats under **Student Number
+Format** (`settings/studentNumber`): `#` digit, `@` letter, `*` either, all
+else literal. The app checks sign-in, admission and the Bursar's entries
+against them. With none set, any 3 to 30 character number of letters, digits,
+`/`, `.` or `-` is accepted. The rules enforce only that basic shape, so the
+format is not a security control. The database field is still named `nsin`.
+`student_bio` ids replace `/` with `_`; numbers without `/` are prefixed `N_`.
+
 ## Viewing fees
 
 The app asks the Worker (`POST /fees`, `worker/src/fees.js`), which reads the
 records with the Firebase service account.
 
 - Signed-in student (**My fees**): payment code only. The app sends the
-  session NSIN, which must match the record.
-- Parents, guardians and students without an NSIN (**Use payment code** on the
+  session student number, which must match the record.
+- Parents, guardians and students without a student number (**Use payment code** on the
   sign-in screen): payment code, parent or guardian names, and two of: date of
   birth, home district and village, student's full name, primary school,
   secondary school.
@@ -65,12 +75,12 @@ Worker. Fee viewing works only after the Worker has been deployed from `main`.
 
 ## Known gaps
 
-- NSINs are public, and the signed-in route asks only for the code and the
-  NSIN. Anyone holding a code who knows or guesses the NSIN can skip the
+- student numbers are public, and the signed-in route asks only for the code and the
+  student number. Anyone holding a code who knows or guesses the student number can skip the
   parent questions. Closing this needs real student sign-in.
 - Anyone who knows a code can use up its five attempts and lock it for the day.
 - The service account key held by the Worker has broad rights over the
   Firebase project. A dedicated, database-only account would be safer.
 - A wrongly typed payment number cannot be changed in the app.
-- A record's name, NSIN and semester cannot be edited after saving.
-- A mistyped NSIN stops the student seeing the record.
+- A record's name, student number and semester cannot be edited after saving.
+- A mistyped student number stops the student seeing the record.

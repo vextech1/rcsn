@@ -4,9 +4,10 @@ import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/utils/money.dart';
-import '../../../core/utils/nsin_validator.dart';
+import '../../../core/utils/student_number.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
+import '../../../data/repositories/student_number_repository.dart';
 import '../../../data/repositories/student_repository.dart';
 import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/forms/academic_structure_picker.dart';
@@ -63,7 +64,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   }
 
   Future<void> _find() async {
-    final problem = NsinValidator.errorMessage(_nsin.text);
+    final problem = StudentNumber.basicError(_nsin.text);
     if (problem != null) {
       setState(() => _error = UnknownFailure(problem));
       return;
@@ -112,6 +113,12 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
       _error = null;
     });
     try {
+      // A number already on file stays valid if the format has since changed.
+      final number = StudentNumber.normalize(_nsin.text);
+      if (number.isNotEmpty && number != widget.from?.nsin) {
+        final mismatch = await StudentNumberRepository().check(number);
+        if (mismatch != null) throw UnknownFailure(mismatch);
+      }
       final id = await FeeRepository().create(
         paymentNumber: _number.text,
         nsin: _nsin.text,
@@ -154,10 +161,10 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
             children: [
             AppTextField(
               controller: _nsin,
-              label: 'NSIN (leave empty if not yet given)',
+              label: 'Student number (leave empty if not yet given)',
               validator: (v) => (v ?? '').trim().isEmpty
                   ? null
-                  : NsinValidator.errorMessage(v!),
+                  : StudentNumber.basicError(v!),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
