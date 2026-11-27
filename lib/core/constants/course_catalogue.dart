@@ -14,20 +14,38 @@ class CourseUnit {
 /// is offered these when setting up a class, and can change them. Classes not
 /// listed here are typed in by hand.
 const Map<ProgramType, Map<(int, int), List<CourseUnit>>> kCourseCatalogue = {
+  // As printed on the UHPAB December 2026 examination timetable. The code
+  // reads as year, semester, paper.
   ProgramType.certificateNursing: {
     (1, 1): [
-      CourseUnit('CN 1101', 'Foundations of Nursing I'),
-      CourseUnit('CN 1102', 'Anatomy and Physiology I'),
-      CourseUnit('CN 1103', 'First Aid and Emergencies'),
-      CourseUnit('CN 1104', 'Microbiology'),
-      CourseUnit('CN 1105', 'Personal and Communal Health'),
+      CourseUnit('CN 111', 'Anatomy and Physiology I and First Aid'),
+      CourseUnit('CN 112', 'Foundations of Nursing I and Computer'),
+      CourseUnit('CN 113', 'Personal and Community Health and Microbiology'),
+      CourseUnit('CN 114', 'Practicals'),
     ],
     (1, 2): [
-      CourseUnit('CN 1201', 'Foundations of Nursing II'),
-      CourseUnit('CN 1202', 'Anatomy and Physiology II'),
-      CourseUnit('CN 1203', 'Sociology and Psychology'),
-      CourseUnit('CN 1204', 'Introduction to Computer'),
-      CourseUnit('CN 1205', 'Primary Health Care'),
+      CourseUnit('CN 121', 'Anatomy and Physiology II'),
+      CourseUnit('CN 122', 'Foundations of Nursing II, Sociology and Psychology'),
+      CourseUnit('CN 123', 'Primary Healthcare'),
+      CourseUnit('CN 124', 'Practicals'),
+    ],
+    (2, 1): [
+      CourseUnit('CN 211', 'Medical Nursing I and Pharmacology I'),
+      CourseUnit('CN 212', 'Surgical Nursing I and Gynaecology'),
+      CourseUnit('CN 213', 'Paediatric Nursing I and Palliative Care'),
+      CourseUnit('CN 214', 'Practicals'),
+    ],
+    (2, 2): [
+      CourseUnit('CN 221', 'Medical Nursing II and Pharmacology II'),
+      CourseUnit('CN 222', 'Surgical Nursing II and Paediatric Nursing II'),
+      CourseUnit('CN 223', 'Mental Health and Occupational Health'),
+      CourseUnit('CN 224', 'Practicals'),
+    ],
+    (3, 1): [
+      CourseUnit('CN 311', 'Tropical Medicine and Surgical Nursing III'),
+      CourseUnit('CN 312', 'Reproductive Health, Guidance and Counselling'),
+      CourseUnit('CN 313', 'Health Service Management and Entrepreneurship'),
+      CourseUnit('CN 314', 'Practicals'),
     ],
   },
 };
@@ -52,7 +70,8 @@ bool hasUnit(
   return subjects.any(
     (s) =>
         s.id == id ||
-        plain(s.name) == plain(unit.title) ||
+        // Every class has its own "Practicals", so that title alone says nothing.
+        (unit.title != 'Practicals' && plain(s.name) == plain(unit.title)) ||
         plain(s.name).startsWith(plain(unit.code)),
   );
 }

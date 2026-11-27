@@ -15,17 +15,29 @@ void main() {
       });
     });
     expect(ids.toSet(), hasLength(ids.length));
-    expect(standardUnits(track, 1, 1), hasLength(5));
-    expect(standardUnits(track, 1, 2), hasLength(5));
+    // Three papers and a practical in each of the five semesters.
+    kTrackDefinitions[track]!.semestersPerYear.forEach((year, count) {
+      for (var semester = 1; semester <= count; semester++) {
+        expect(
+          standardUnits(track, year, semester).map((u) => u.code),
+          [for (var n = 1; n <= 4; n++) 'CN $year$semester$n'],
+        );
+      }
+    });
   });
 
   test('a unit is recognised however it was added', () {
-    final unit = standardUnits(track, 1, 1)[3]; // Microbiology
+    final unit = standardUnits(track, 1, 2)[0]; // Anatomy II
     bool has(String id, String name) =>
         hasUnit(track, unit, [(id: id, name: name)]);
-    expect(has('certificateNursing_CN1104', 'Renamed'), isTrue);
-    expect(has('abc', ' microbiology'), isTrue);
-    expect(has('abc', 'CN1104 Microbiology'), isTrue);
+    expect(has('certificateNursing_CN121', 'Renamed'), isTrue);
+    expect(has('abc', ' anatomy and physiology ii'), isTrue);
+    expect(has('abc', 'CN121 Anatomy'), isTrue);
     expect(has('abc', 'Anatomy'), isFalse);
+    final practical = standardUnits(track, 2, 1)[3];
+    expect(
+      hasUnit(track, practical, [(id: 'abc', name: 'Practicals')]),
+      isFalse,
+    );
   });
 }
