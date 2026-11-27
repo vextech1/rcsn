@@ -18,6 +18,8 @@ import '../../screens/staff/dashboard/staff_member_dashboard_screen.dart';
 import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
+import '../../screens/bursar/add/bursar_add_fee_screen.dart';
+import '../../screens/bursar/detail/bursar_fee_detail_screen.dart';
 import '../../screens/bursar/dashboard/bursar_dashboard_screen.dart';
 import '../../screens/admin/structure/admin_structure_screen.dart';
 import '../../screens/admin/tutors/admin_tutors_screen.dart';
@@ -144,6 +146,23 @@ GoRouter buildAppRouter({
 
       // Bursar
       GoRoute(path: AppRoutes.bursarDashboard, builder: (_, __) => const BursarDashboardScreen()),
+      GoRoute(
+        path: AppRoutes.bursarAdd,
+        builder: (_, state) {
+          final extra = state.extra;
+          return BursarAddFeeScreen(initialNsin: extra is String ? extra : null);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.bursarRecord,
+        // The record id travels as `extra`; without it, show the list.
+        builder: (_, state) {
+          final extra = state.extra;
+          return extra is String
+              ? BursarFeeDetailScreen(feeId: extra)
+              : const BursarDashboardScreen();
+        },
+      ),
 
       // Tutor
       GoRoute(path: AppRoutes.tutorRegister, builder: (_, __) => const TutorRegisterScreen()),

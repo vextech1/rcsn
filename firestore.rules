@@ -74,6 +74,19 @@ service cloud.firestore {
       );
     }
 
+    function isTuition(amount) {
+      return amount is int && amount > 0 && amount <= 1000000000;
+    }
+
+    function isFeeStamp() {
+      return request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function paymentPath(feeId, paymentId) {
+      return /databases/$(database)/documents/student_fees/$(feeId)/payments/$(paymentId);
+    }
+
     // -------------------------------------------------------------------
     // staff — Principal, Deputy Principal, Registrar, Bursar and other staff
     // -------------------------------------------------------------------
@@ -549,6 +562,95 @@ service cloud.firestore {
       // yet; this rule allows it so the capability exists when the
       // UI catches up, but Admin should be careful.
       allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // student_fees — tuition per student per semester, kept by the Bursar
+    // -------------------------------------------------------------------
+    //
+    // No student access yet: an NSIN is guessable, so a student fee view
+    // needs its own secret (docs/BURSAR.md). Nothing is ever deleted, and
+    // `paid` only moves together with a new payment of the same amount.
+
+    match /student_fees/{feeId} {
+      allow read: if isBursar() || isPrincipalLevel();
+
+      allow create: if isBursar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'name', 'programType', 'year', 'semester', 'tuition',
+              'paid', 'updatedBy', 'updatedAt'])
+        && request.resource.data.keys().hasAll(
+             ['nsin', 'name', 'programType', 'year', 'semester', 'tuition',
+              'paid', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.nsin.matches(
+             '[A-Z]{3}[0-9]{2}/U028/[A-Z]{2,4}/[0-9]{2,4}')
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.programType in
+             ['certificateMidwifery', 'certificateNursing',
+              'diplomaDirectMidwifery', 'diplomaDirectNursing',
+              'diplomaExtensionMidwifery', 'diplomaExtensionNursing']
+        && request.resource.data.year in [1, 2, 3]
+        && request.resource.data.semester in [1, 2]
+        && feeId == request.resource.data.nsin.replace('/', '_')
+             + '_Y' + string(request.resource.data.year)
+             + 'S' + string(request.resource.data.semester)
+        && isTuition(request.resource.data.tuition)
+        && request.resource.data.paid is int
+        && request.resource.data.paid == 0
+        && isFeeStamp();
+
+      allow update: if isBursar()
+        && isFeeStamp()
+        && (
+          // Change the tuition.
+          (request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['tuition', 'updatedBy', 'updatedAt'])
+            && isTuition(request.resource.data.tuition))
+          ||
+          // Record a payment: a new entry in the same write, same amount.
+          (request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['paid', 'lastPaymentId', 'updatedBy', 'updatedAt'])
+            && !exists(paymentPath(feeId, request.resource.data.lastPaymentId))
+            && existsAfter(paymentPath(feeId, request.resource.data.lastPaymentId))
+            && request.resource.data.paid == resource.data.paid
+                 + getAfter(paymentPath(feeId, request.resource.data.lastPaymentId))
+                     .data.amount
+            && request.resource.data.paid >= 0)
+        );
+
+      allow delete: if false;
+
+      match /payments/{paymentId} {
+        allow read: if isBursar() || isPrincipalLevel();
+
+        // Only valid when the parent record points at this entry in the
+        // same write, which makes the parent rule check the amount.
+        allow create: if isBursar()
+          && request.resource.data.keys().hasOnly(
+               ['amount', 'method', 'reference', 'recordedBy', 'createdAt'])
+          && request.resource.data.keys().hasAll(
+               ['amount', 'method', 'reference', 'recordedBy', 'createdAt'])
+          && request.resource.data.amount is int
+          && request.resource.data.amount != 0
+          && request.resource.data.amount >= -1000000000
+          && request.resource.data.amount <= 1000000000
+          && request.resource.data.method in
+               ['bank', 'mobileMoney', 'cash', 'correction']
+          && (request.resource.data.amount > 0
+              || request.resource.data.method == 'correction')
+          && request.resource.data.reference is string
+          && request.resource.data.reference.size() >= 1
+          && request.resource.data.reference.size() <= 100
+          && request.resource.data.recordedBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/student_fees/$(feeId))
+               .data.lastPaymentId == paymentId;
+
+        allow update, delete: if false;
+      }
     }
 
     // -------------------------------------------------------------------

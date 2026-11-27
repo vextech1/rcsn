@@ -23,6 +23,7 @@ const {
   query,
   where,
   Timestamp,
+  writeBatch,
 } = require('firebase/firestore');
 
 let env;
@@ -602,5 +603,72 @@ describe('public space (public_posts)', () => {
     await assertSucceeds(deleteDoc(doc(as('registrar1'), 'public_posts/pub1')));
     await assertFails(deleteDoc(doc(as('tutor1'), 'public_posts/pend1')));
     await assertFails(deleteDoc(doc(anon(), 'public_posts/pend1')));
+  });
+});
+
+describe('student fees', () => {
+  const id = 'JAN26_U028_MCK_001_Y1S1';
+  const feePath = `student_fees/${id}`;
+  const as = (uid) => env.authenticatedContext(uid).firestore();
+  const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const record = (extra = {}) => ({
+    nsin: 'JAN26/U028/MCK/001', name: 'Mary Achieng',
+    programType: 'certificateNursing', year: 1, semester: 1,
+    tuition: 1000, paid: 0, ...stamp('bursar1'), ...extra,
+  });
+  const open = () => setDoc(doc(as('bursar1'), feePath), record());
+  const pay = (amount, paid, { pid = 'p1', method = 'bank' } = {}) => {
+    const db = as('bursar1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${feePath}/payments/${pid}`), {
+      amount, method, reference: 'R1', recordedBy: 'bursar1', createdAt: serverTimestamp(),
+    });
+    batch.update(doc(db, feePath), { paid, lastPaymentId: pid, ...stamp('bursar1') });
+    return batch.commit();
+  };
+
+  it('the bursar can open a record', async () => {
+    await assertSucceeds(open());
+  });
+  it('rejects a wrong id, money already paid, or extra fields', async () => {
+    const db = as('bursar1');
+    await assertFails(setDoc(doc(db, 'student_fees/other'), record()));
+    await assertFails(setDoc(doc(db, feePath), record({ paid: 5 })));
+    await assertFails(setDoc(doc(db, feePath), record({ note: 'x' })));
+  });
+  it('only the bursar writes; only bursar and principal level read', async () => {
+    await assertSucceeds(open());
+    for (const uid of ['principal1', 'deputy1', 'registrar1', 'tutor1']) {
+      await assertFails(updateDoc(doc(as(uid), feePath), { tuition: 1, ...stamp(uid) }));
+    }
+    await assertSucceeds(getDoc(doc(as('principal1'), feePath)));
+    await assertSucceeds(getDocs(collection(as('bursar1'), 'student_fees')));
+    for (const uid of ['registrar1', 'tutor1', 'askari1']) {
+      await assertFails(getDoc(doc(as(uid), feePath)));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), feePath)));
+  });
+  it('records payments and negative corrections', async () => {
+    await assertSucceeds(open());
+    await assertSucceeds(pay(400, 400));
+    await assertSucceeds(pay(-100, 300, { pid: 'p2', method: 'correction' }));
+  });
+  it('keeps paid and payments in step', async () => {
+    await assertSucceeds(open());
+    await assertFails(pay(400, 900));
+    await assertFails(pay(-100, -100, { method: 'correction' }));
+    await assertFails(updateDoc(doc(as('bursar1'), feePath), { paid: 1000, ...stamp('bursar1') }));
+    await assertFails(setDoc(doc(as('bursar1'), `${feePath}/payments/p9`), {
+      amount: 5, method: 'bank', reference: 'R', recordedBy: 'bursar1', createdAt: serverTimestamp(),
+    }));
+    await assertSucceeds(pay(400, 400));
+    await assertFails(pay(400, 800)); // same payment id again
+    await assertFails(pay(-100, 300, { pid: 'p2' })); // negative, not a correction
+  });
+  it('never deletes', async () => {
+    await assertSucceeds(open());
+    await assertSucceeds(pay(400, 400));
+    await assertFails(deleteDoc(doc(as('bursar1'), feePath)));
+    await assertFails(deleteDoc(doc(as('bursar1'), `${feePath}/payments/p1`)));
   });
 });

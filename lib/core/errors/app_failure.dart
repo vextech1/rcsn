@@ -106,6 +106,11 @@ class StructureNotFoundFailure extends AppFailure {
         );
 }
 
+/// A fee record could not be saved.
+class FeeFailure extends AppFailure {
+  const FeeFailure(super.message);
+}
+
 // ---------------------------------------------------------------------
 // Generic fallback
 // ---------------------------------------------------------------------
