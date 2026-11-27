@@ -80,6 +80,13 @@ class FeeRepository {
         _fees.where('paymentNumber', isEqualTo: paymentNumber),
       );
 
+  /// A student's records, newest semester first. Bursar and Principal level
+  /// only.
+  Future<List<StudentFee>> recordsForStudent(String nsin) async => (await _fetch(
+        _fees.where('nsin', isEqualTo: StudentNumber.normalize(nsin)),
+      ))
+        ..sort((a, b) => b.id.compareTo(a.id));
+
   /// Every record of one class: a programme, year and semester.
   Future<List<StudentFee>> classRecords(
     ProgramType programType,

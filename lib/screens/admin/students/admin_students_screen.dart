@@ -325,6 +325,10 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
           itemBuilder: (context, index) {
             final student = students[index];
             return ListTile(
+              onTap: () => context.push(
+                AppRoutes.registrarStudentDetail,
+                extra: student,
+              ),
               title: Text(student.name),
               subtitle: Text(
                 '${student.nsin} · Year ${student.year}, Sem ${student.semester} '

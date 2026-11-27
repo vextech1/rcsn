@@ -54,6 +54,7 @@ class AppRoutes {
   static const String registrarStudents = '/registrar/students';
   static const String registrarContentTypes = '/registrar/content-types';
   static const String registrarStudentBio = '/registrar/students/bio';
+  static const String registrarStudentDetail = '/registrar/students/detail';
   static const String registrarStudentNumber = '/registrar/student-number';
 
   // Bursar
