@@ -34,17 +34,18 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Placeholder for the actual RCSN crest image asset — the
-              // real crest file (from rcsn.info, discussed during the
-              // branding phase) needs to be added under assets/images/
-              // and referenced here via Image.asset once the file itself
-              // is placed in this project. Using an icon placeholder for
-              // now so this screen is complete and runnable without
-              // blocking on that asset file being physically present.
-              const Icon(
-                Icons.local_hospital,
-                size: 96,
-                color: Colors.white,
+              // The full, uncropped school logo (the same artwork as the
+              // launcher icon, minus the adaptive-icon crop). BoxFit.contain
+              // keeps its aspect ratio so nothing is clipped or stretched.
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260, maxHeight: 240),
+                  child: Image.asset(
+                    'assets/icons/app_icon.png',
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Rakai Community School of Nursing logo',
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               Text(
