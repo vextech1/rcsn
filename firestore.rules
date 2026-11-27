@@ -568,20 +568,33 @@ service cloud.firestore {
     // student_fees — tuition per student per semester, kept by the Bursar
     // -------------------------------------------------------------------
     //
-    // No student access yet: an NSIN is guessable, so a student fee view
-    // needs its own secret (docs/BURSAR.md). Nothing is ever deleted, and
-    // `paid` only moves together with a new payment of the same amount.
+    // Students have no sign-in. Knowing the payment number is what lets them
+    // read a record: the id starts with it, single reads are open and listing
+    // is staff-only. Nothing is ever deleted, and `paid` only moves together
+    // with a new payment of the same amount.
+
+    // Which student owns a payment number. Written once, never changed.
+    match /fee_numbers/{number} {
+      allow read: if isBursar();
+      allow create: if isBursar()
+        && number.matches('[A-Z0-9]{4,10}')
+        && request.resource.data.keys().hasOnly(['nsin', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && isFeeStamp();
+      allow update, delete: if false;
+    }
 
     match /student_fees/{feeId} {
-      allow read: if isBursar() || isPrincipalLevel();
+      allow get: if true;
+      allow list: if isBursar() || isPrincipalLevel();
 
       allow create: if isBursar()
         && request.resource.data.keys().hasOnly(
-             ['nsin', 'name', 'programType', 'year', 'semester', 'tuition',
-              'paid', 'updatedBy', 'updatedAt'])
+             ['paymentNumber', 'nsin', 'name', 'programType', 'year', 'semester',
+              'tuition', 'paid', 'updatedBy', 'updatedAt'])
         && request.resource.data.keys().hasAll(
-             ['nsin', 'name', 'programType', 'year', 'semester', 'tuition',
-              'paid', 'updatedBy', 'updatedAt'])
+             ['paymentNumber', 'nsin', 'name', 'programType', 'year', 'semester',
+              'tuition', 'paid', 'updatedBy', 'updatedAt'])
         && request.resource.data.nsin is string
         && request.resource.data.nsin.matches(
              '[A-Z]{3}[0-9]{2}/U028/[A-Z]{2,4}/[0-9]{2,4}')
@@ -594,7 +607,10 @@ service cloud.firestore {
               'diplomaExtensionMidwifery', 'diplomaExtensionNursing']
         && request.resource.data.year in [1, 2, 3]
         && request.resource.data.semester in [1, 2]
-        && feeId == request.resource.data.nsin.replace('/', '_')
+        && request.resource.data.paymentNumber is string
+        && getAfter(/databases/$(database)/documents/fee_numbers/$(request.resource.data.paymentNumber))
+             .data.nsin == request.resource.data.nsin
+        && feeId == request.resource.data.paymentNumber
              + '_Y' + string(request.resource.data.year)
              + 'S' + string(request.resource.data.semester)
         && isTuition(request.resource.data.tuition)

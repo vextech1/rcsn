@@ -5,9 +5,11 @@ it; the app takes no payments.
 
 ## Data
 
-`student_fees/{NSIN with _ for /}_Y{year}S{semester}`: `nsin`, `name`,
-`programType`, `year`, `semester`, `tuition`, `paid`, `lastPaymentId`,
+`student_fees/{paymentNumber}_Y{year}S{semester}`: `paymentNumber`, `nsin`,
+`name`, `programType`, `year`, `semester`, `tuition`, `paid`, `lastPaymentId`,
 `updatedBy`, `updatedAt`. Amounts are whole shillings. Balance = tuition - paid.
+`fee_numbers/{paymentNumber}`: the owning `nsin`, written once.
+Payment numbers: 4 to 10 letters or digits, one per student.
 Status: Not paid, Balance due, Cleared (balance zero or less).
 
 `.../payments/{id}`: `amount`, `method`, `reference`, `recordedBy`, `createdAt`.
@@ -16,7 +18,9 @@ Status: Not paid, Balance due, Cleared (balance zero or less).
 
 - Bursar: read, open records, change tuition, record payments.
 - Principal and Deputy Principal: read only.
-- Everyone else, including Registrar, tutors and signed-out users: nothing.
+- Students (no sign-in): read a record only by its id, which needs the payment
+  number. No listing, searching, payment history or writing.
+- Registrar, tutors and other staff cannot list records.
 - `paid` changes only together with a new payment of the same amount.
 - Payments and records are never deleted or edited. Fix mistakes with a
   correction entry.
@@ -25,14 +29,15 @@ Status: Not paid, Balance due, Cleared (balance zero or less).
 
 1. Bursar screens: list, search, filter, totals, add student, record payment,
    history. **Built.**
-2. Student fee view (read-only). **Needs a decision:** students enter with an
-   NSIN only, which is guessable, so fees need a second secret. Proposed: the
-   Bursar issues each student a fee access code.
+2. Student fee view: enter the payment number under My fees. **Built.**
 3. Principal read-only screen.
 4. Later: bulk tuition per class, CSV export, printable clearance.
 
 ## Known gaps
 
+- Anyone who knows or guesses a payment number can read that record. Short or
+  sequential numbers are weak. The app also checks the NSIN matches, but the
+  database cannot.
+- A wrongly typed payment number cannot be changed in the app.
 - A record's name, NSIN and semester cannot be edited after saving.
-- Records typed before admission link by NSIN only; a mistyped NSIN will not
-  match.
+- A mistyped NSIN stops the student seeing the record.

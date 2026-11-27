@@ -13,11 +13,13 @@ enum FeeStatus {
 /// One student's tuition for one semester, kept by the Bursar.
 ///
 /// Lives in `student_fees`, never on the `students` document (see
-/// StudentRecord's doc comment). Linked to the student by NSIN. Amounts are
+/// StudentRecord's doc comment). Linked to the student by NSIN, and found by
+/// the student with their payment number. Amounts are
 /// whole Uganda shillings. Balance and status are always derived, so they
 /// cannot disagree with the figures.
 class StudentFee {
   final String id;
+  final String paymentNumber;
   final String nsin;
   final String name;
   final ProgramType programType;
@@ -28,6 +30,7 @@ class StudentFee {
 
   const StudentFee({
     required this.id,
+    required this.paymentNumber,
     required this.nsin,
     required this.name,
     required this.programType,
@@ -38,8 +41,19 @@ class StudentFee {
   });
 
   /// One record per student per semester. The rules check this same shape.
-  static String idFor(String nsin, int year, int semester) =>
-      '${nsin.replaceAll('/', '_')}_Y${year}S$semester';
+  static String idFor(String paymentNumber, int year, int semester) =>
+      '${paymentNumber}_Y${year}S$semester';
+
+  /// Upper case, no spaces.
+  static String normalizeNumber(String input) =>
+      input.replaceAll(RegExp(r'\s'), '').toUpperCase();
+
+  /// Null if [input] is a usable payment number: letters and digits, at most
+  /// 10. The minimum of 4 keeps it from being trivially guessed.
+  static String? numberError(String input) =>
+      RegExp(r'^[A-Z0-9]{4,10}$').hasMatch(normalizeNumber(input))
+          ? null
+          : 'Enter the payment number (4 to 10 letters or digits)';
 
   /// Negative when the student has paid more than the tuition.
   int get balance => tuition - paid;
@@ -52,6 +66,7 @@ class StudentFee {
   factory StudentFee.fromMap(String id, Map<String, dynamic> data) {
     return StudentFee(
       id: id,
+      paymentNumber: data['paymentNumber'] as String,
       nsin: data['nsin'] as String,
       name: data['name'] as String,
       programType: ProgramType.values.byName(data['programType'] as String),

@@ -39,8 +39,47 @@ class FeeRepository {
       .snapshots()
       .map((snap) => snap.docs.map(FeePayment.fromFirestore).toList());
 
+  CollectionReference<Map<String, dynamic>> get _numbers =>
+      _firestore.collection('fee_numbers');
+
+  /// The payment number already attached to this student, if any.
+  Future<String?> numberFor(String nsin) async {
+    final found = await _fees
+        .where('nsin', isEqualTo: NsinValidator.normalize(nsin))
+        .limit(1)
+        .get();
+    return found.docs.isEmpty
+        ? null
+        : StudentFee.fromFirestore(found.docs.first).paymentNumber;
+  }
+
+  /// A student's own view: every semester filed under [paymentNumber].
+  /// Direct reads only, because the rules do not let students search.
+  Future<List<StudentFee>> findByNumber(String paymentNumber) async {
+    final number = StudentFee.normalizeNumber(paymentNumber);
+    try {
+      final docs = await Future.wait([
+        for (final year in [3, 2, 1])
+          for (final semester in [2, 1])
+            _fees.doc(StudentFee.idFor(number, year, semester)).get(
+                  // Never show a cached balance as the current one.
+                  const GetOptions(source: Source.server),
+                ),
+      ]);
+      return [
+        for (final doc in docs)
+          if (doc.exists) StudentFee.fromFirestore(doc),
+      ];
+    } on FirebaseException {
+      throw const FeeFailure(
+        'Could not load your fees. Check your connection and try again.',
+      );
+    }
+  }
+
   /// Opens a student's record for a semester, with nothing paid yet.
   Future<String> create({
+    required String paymentNumber,
     required String nsin,
     required String name,
     required ProgramType programType,
@@ -49,14 +88,30 @@ class FeeRepository {
     required int tuition,
   }) async {
     final normalized = NsinValidator.normalize(nsin);
-    final ref = _fees.doc(StudentFee.idFor(normalized, year, semester));
+    final number = StudentFee.normalizeNumber(paymentNumber);
+    final ref = _fees.doc(StudentFee.idFor(number, year, semester));
+    final numberRef = _numbers.doc(number);
+    final existing = await numberFor(normalized);
+    if (existing != null && existing != number) {
+      throw FeeFailure('This student already has payment number $existing.');
+    }
     await _run(() => _firestore.runTransaction((tx) async {
+          final owner = await tx.get(numberRef);
+          if (owner.exists && owner.data()!['nsin'] != normalized) {
+            throw const FeeFailure(
+              'That payment number belongs to another student.',
+            );
+          }
           if ((await tx.get(ref)).exists) {
             throw const FeeFailure(
               'This student already has a record for that semester.',
             );
           }
+          if (!owner.exists) {
+            tx.set(numberRef, {'nsin': normalized, ..._stamp()});
+          }
           tx.set(ref, {
+            'paymentNumber': number,
             'nsin': normalized,
             'name': name.trim(),
             'programType': programType.name,

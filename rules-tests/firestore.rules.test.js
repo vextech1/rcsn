@@ -607,16 +607,22 @@ describe('public space (public_posts)', () => {
 });
 
 describe('student fees', () => {
-  const id = 'JAN26_U028_MCK_001_Y1S1';
+  const id = 'PN12345_Y1S1';
   const feePath = `student_fees/${id}`;
   const as = (uid) => env.authenticatedContext(uid).firestore();
   const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
   const record = (extra = {}) => ({
-    nsin: 'JAN26/U028/MCK/001', name: 'Mary Achieng',
+    paymentNumber: 'PN12345', nsin: 'JAN26/U028/MCK/001', name: 'Mary Achieng',
     programType: 'certificateNursing', year: 1, semester: 1,
     tuition: 1000, paid: 0, ...stamp('bursar1'), ...extra,
   });
-  const open = () => setDoc(doc(as('bursar1'), feePath), record());
+  const open = (extra = {}, owner = 'JAN26/U028/MCK/001') => {
+    const db = as('bursar1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'fee_numbers/PN12345'), { nsin: owner, ...stamp('bursar1') });
+    batch.set(doc(db, feePath), record(extra));
+    return batch.commit();
+  };
   const pay = (amount, paid, { pid = 'p1', method = 'bank' } = {}) => {
     const db = as('bursar1');
     const batch = writeBatch(db);
@@ -631,10 +637,11 @@ describe('student fees', () => {
     await assertSucceeds(open());
   });
   it('rejects a wrong id, money already paid, or extra fields', async () => {
-    const db = as('bursar1');
-    await assertFails(setDoc(doc(db, 'student_fees/other'), record()));
-    await assertFails(setDoc(doc(db, feePath), record({ paid: 5 })));
-    await assertFails(setDoc(doc(db, feePath), record({ note: 'x' })));
+    await assertFails(open({ paymentNumber: 'OTHER1' }));
+    await assertFails(open({ paid: 5 }));
+    await assertFails(open({ note: 'x' }));
+    await assertFails(open({}, 'JAN26/U028/MCK/002'));
+    await assertFails(setDoc(doc(as('bursar1'), feePath), record()));
   });
   it('only the bursar writes; only bursar and principal level read', async () => {
     await assertSucceeds(open());
@@ -643,10 +650,23 @@ describe('student fees', () => {
     }
     await assertSucceeds(getDoc(doc(as('principal1'), feePath)));
     await assertSucceeds(getDocs(collection(as('bursar1'), 'student_fees')));
-    for (const uid of ['registrar1', 'tutor1', 'askari1']) {
-      await assertFails(getDoc(doc(as(uid), feePath)));
+    for (const uid of ['registrar1', 'askari1']) {
+      await assertFails(getDocs(collection(as(uid), 'student_fees')));
     }
-    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), feePath)));
+    await assertFails(getDocs(collection(as('tutor1'), 'student_fees')));
+  });
+  it('a student reads by payment number but cannot list, search or write', async () => {
+    await assertSucceeds(open());
+    await assertSucceeds(pay(400, 400));
+    const db = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, feePath)));
+    await assertSucceeds(getDoc(doc(db, 'student_fees/PN12345_Y2S1')));
+    await assertFails(getDocs(collection(db, 'student_fees')));
+    await assertFails(getDocs(query(collection(db, 'student_fees'),
+      where('nsin', '==', 'JAN26/U028/MCK/001'))));
+    await assertFails(getDoc(doc(db, 'fee_numbers/PN12345')));
+    await assertFails(getDocs(collection(db, `${feePath}/payments`)));
+    await assertFails(updateDoc(doc(db, feePath), { tuition: 1 }));
   });
   it('records payments and negative corrections', async () => {
     await assertSucceeds(open());

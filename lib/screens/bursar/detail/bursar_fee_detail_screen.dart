@@ -75,6 +75,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
             children: [
               Text(fee.name, style: Theme.of(context).textTheme.headlineSmall),
               Text(fee.nsin),
+              Text('Payment number: ${fee.paymentNumber}'),
               Text(kTrackDefinitions[fee.programType]?.label ??
                   fee.programType.name),
               Text('Year ${fee.year} · Semester ${fee.semester}'),

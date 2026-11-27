@@ -76,7 +76,8 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
               .where((f) => _filter == null || f.status == _filter)
               .where((f) =>
                   f.name.toLowerCase().contains(query) ||
-                  f.nsin.toLowerCase().contains(query))
+                  f.nsin.toLowerCase().contains(query) ||
+                  f.paymentNumber.toLowerCase().contains(query))
               .toList();
           final collected = shown.fold<int>(0, (sum, f) => sum + f.paid);
           // Overpayments by one student do not reduce what others owe.
@@ -89,7 +90,7 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
                   decoration: const InputDecoration(
-                    labelText: 'Search name or NSIN',
+                    labelText: 'Search name, NSIN or payment number',
                     prefixIcon: Icon(Icons.search),
                   ),
                   onChanged: (value) => setState(() => _search = value),
@@ -128,7 +129,7 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
                     return ListTile(
                       title: Text(fee.name),
                       subtitle: Text(
-                        '${fee.nsin}\nYear ${fee.year}, Sem ${fee.semester} · '
+                        '${fee.paymentNumber} · ${fee.nsin}\nYear ${fee.year}, Sem ${fee.semester} · '
                         'Balance ${formatUgx(fee.balance)}',
                       ),
                       isThreeLine: true,

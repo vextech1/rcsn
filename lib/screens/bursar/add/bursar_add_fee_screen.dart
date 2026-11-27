@@ -5,6 +5,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/utils/nsin_validator.dart';
+import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../data/repositories/student_repository.dart';
 import '../../../widgets/common/app_error_display.dart';
@@ -29,6 +30,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   final _formKey = GlobalKey<FormState>();
   late final _nsin = TextEditingController(text: widget.initialNsin);
   final _name = TextEditingController();
+  final _number = TextEditingController();
   final _tuition = TextEditingController();
 
   ProgramType? _track;
@@ -49,6 +51,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   void dispose() {
     _nsin.dispose();
     _name.dispose();
+    _number.dispose();
     _tuition.dispose();
     super.dispose();
   }
@@ -66,8 +69,10 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
     });
     try {
       final student = await StudentRepository().findByNsin(_nsin.text);
+      final number = await FeeRepository().numberFor(_nsin.text);
       if (!mounted) return;
       setState(() {
+        if (number != null) _number.text = number;
         if (student == null) {
           _lookupNote = 'Not admitted yet. Enter the details below.';
         } else {
@@ -102,6 +107,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
     });
     try {
       final id = await FeeRepository().create(
+        paymentNumber: _number.text,
         nsin: _nsin.text,
         name: _name.text,
         programType: _track!,
@@ -162,6 +168,12 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
                 _year = year;
                 _semester = semester;
               },
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: _number,
+              label: 'Payment number',
+              validator: (v) => StudentFee.numberError(v ?? ''),
             ),
             const SizedBox(height: 12),
             AppTextField(
