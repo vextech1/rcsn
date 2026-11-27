@@ -28,6 +28,7 @@ dependencies:
   # --- File handling / uploads ---
   file_picker: ^8.1.3         # tutor file selection (image/pdf/excel/word)
   path_provider: ^2.1.4       # local paths for offline-downloaded files
+  url_launcher: ^6.3.0         # video and audio links on public posts
   open_filex: ^4.6.0          # opening downloaded files in their native viewer
 
   # --- Local persistence (offline download tracking, Section 2.3) ---

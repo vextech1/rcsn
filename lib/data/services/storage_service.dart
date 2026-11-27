@@ -102,19 +102,32 @@ class StorageService {
     }
   }
 
+  /// Where [storagePath] is served. Throws if storage is not set up.
+  Uri urlFor(String storagePath) => _uriFor(storagePath);
+
+  /// The sign-in header, or nothing for the public.
+  Future<Map<String, String>> optionalHeaders() async {
+    final token =
+        await (_auth ?? FirebaseAuth.instance).currentUser?.getIdToken();
+    return token == null ? {} : {'Authorization': 'Bearer $token'};
+  }
+
   /// Downloads a file to [localPath] (Section 2.3). Students have no sign-in,
   /// so they pass their [studentNsin] instead.
   Future<File> downloadForOffline({
     required String storagePath,
     required String localPath,
     String? studentNsin,
+    bool public = false,
   }) async {
     final uri = _uriFor(storagePath);
     // Write to a temporary file so a broken download never replaces a good one.
     final partial = File('$localPath.part');
     try {
       final request = http.Request('GET', uri)
-        ..headers.addAll(await _headers(studentNsin: studentNsin));
+        ..headers.addAll(public
+            ? await optionalHeaders()
+            : await _headers(studentNsin: studentNsin));
       final streamed = await _client.send(request);
       if (streamed.statusCode != 200) {
         throw DownloadFailedFailure(

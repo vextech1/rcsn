@@ -4,21 +4,91 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/models/public_post.dart';
+import '../../data/services/storage_service.dart';
 
 /// "5 Mar 2027". Shared by the public screens.
 String formatPostDate(DateTime? date) =>
     date == null ? '' : DateFormat('d MMM y').format(date);
 
-/// A post image from a direct https link, with a neutral placeholder while
+/// An uploaded picture. Unpublished ones need the viewer's sign-in.
+class PostPicture extends StatefulWidget {
+  final PublicPost post;
+  final String name;
+  final BoxFit fit;
+  final double? height;
+
+  const PostPicture({
+    super.key,
+    required this.post,
+    required this.name,
+    this.fit = BoxFit.cover,
+    this.height,
+  });
+
+  @override
+  State<PostPicture> createState() => _PostPictureState();
+}
+
+class _PostPictureState extends State<PostPicture> {
+  late final Future<Map<String, String>> _headers =
+      widget.post.status == PostStatus.published
+          ? Future.value(<String, String>{})
+          : StorageService().optionalHeaders();
+
+  @override
+  Widget build(BuildContext context) {
+    final String url;
+    try {
+      url = StorageService()
+          .urlFor(widget.post.pathOf(widget.name))
+          .toString();
+    } on Exception {
+      return SizedBox(
+        height: widget.height,
+        child: const Center(child: Icon(Icons.broken_image)),
+      );
+    }
+    return FutureBuilder<Map<String, String>>(
+      future: _headers,
+      builder: (context, snapshot) => snapshot.hasData
+          ? PostImage(
+              url: url,
+              headers: snapshot.data,
+              fit: widget.fit,
+              height: widget.height,
+            )
+          : SizedBox(height: widget.height),
+    );
+  }
+}
+
+/// The picture that stands for a post in lists, or null if it has none.
+Widget? postCover(PublicPost post, {double? height}) {
+  final pictures = post.pictures;
+  if (pictures.isNotEmpty) {
+    return PostPicture(
+      key: ValueKey(post.pathOf(pictures.first)),
+      post: post,
+      name: pictures.first,
+      height: height,
+    );
+  }
+  final link = post.imageUrl;
+  return link == null ? null : PostImage(url: link, height: height);
+}
+
+/// A post image from an https address, with a neutral placeholder while
 /// loading and a broken-image icon if the link does not work.
 class PostImage extends StatelessWidget {
   final String url;
   final BoxFit fit;
   final double? height;
+  final Map<String, String>? headers;
 
   const PostImage({
     super.key,
     required this.url,
+    this.headers,
     this.fit = BoxFit.cover,
     this.height,
   });
@@ -27,6 +97,7 @@ class PostImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return CachedNetworkImage(
       imageUrl: url,
+      httpHeaders: headers,
       fit: fit,
       width: double.infinity,
       height: height,
@@ -69,8 +140,7 @@ class PostCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (post.imageUrl != null)
-              PostImage(url: post.imageUrl!, height: 150),
+            if (postCover(post, height: 150) case final cover?) cover,
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(

@@ -252,10 +252,7 @@ class _GalleryTile extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (post.imageUrl != null)
-              PostImage(url: post.imageUrl!)
-            else
-              Container(color: Colors.black12),
+            postCover(post) ?? Container(color: Colors.black12),
             Positioned(
               left: 0,
               right: 0,

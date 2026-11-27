@@ -35,6 +35,19 @@ Allowed: PDF, Word, Excel and images (jpg, jpeg, png, heic), up to 95 MB.
 Existing files are never overwritten. The lists live in
 `worker/src/index.js` and `lib/core/constants/upload_rules.dart`; change both.
 
+## Public Space files
+
+Posts take up to 10 pictures or documents (same types and size as above) and an
+optional https link to video or audio. Files are stored at
+`public/{uid}/{postId}/{name}`; the post lists their names in `attachments`.
+
+- Upload: Principal, Deputy, Registrar, Bursar or an active tutor, under their
+  own id, only before the post exists.
+- Download: whoever may read the post. Everyone once published; the author and
+  moderators while pending.
+- Delete: the uploader or a moderator. Removing a post keeps its files.
+- Older posts with an `imageUrl` link still show it.
+
 ## Website
 
 Add the site's address to `ALLOWED_ORIGINS` in `worker/wrangler.toml`. The site

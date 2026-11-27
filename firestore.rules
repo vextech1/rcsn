@@ -292,7 +292,8 @@ service cloud.firestore {
               'authorRole', 'status', 'createdAt'])
         && request.resource.data.keys().hasOnly(
              ['title', 'body', 'category', 'authorId', 'authorName',
-              'authorRole', 'status', 'createdAt', 'eventDate', 'imageUrl'])
+              'authorRole', 'status', 'createdAt', 'eventDate', 'mediaUrl',
+              'attachments'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.title is string
@@ -308,12 +309,18 @@ service cloud.firestore {
             || request.resource.data.eventDate is timestamp)
         && (request.resource.data.category != 'event'
             || 'eventDate' in request.resource.data)
-        && (!('imageUrl' in request.resource.data)
-            || (request.resource.data.imageUrl is string
-                && request.resource.data.imageUrl.matches('https://.+')
-                && request.resource.data.imageUrl.size() <= 500))
+        // A video or audio link.
+        && (!('mediaUrl' in request.resource.data)
+            || (request.resource.data.mediaUrl is string
+                && request.resource.data.mediaUrl.matches('https://.+')
+                && request.resource.data.mediaUrl.size() <= 500))
+        // Names of the files uploaded for this post.
+        && (!('attachments' in request.resource.data)
+            || (request.resource.data.attachments is list
+                && request.resource.data.attachments.size() >= 1
+                && request.resource.data.attachments.size() <= 10))
         && (request.resource.data.category != 'gallery'
-            || 'imageUrl' in request.resource.data)
+            || 'attachments' in request.resource.data)
         && (
           // Principal, Deputy Principal, Registrar and Bursar publish
           // directly, under their real role and name.

@@ -548,8 +548,11 @@ describe('public space (public_posts)', () => {
     await assertFails(setDoc(doc(db, 'public_posts/b3'), ok({ body: '' })));
     await assertFails(setDoc(doc(db, 'public_posts/b4'), ok({ extra: 1 })));
     await assertFails(setDoc(doc(db, 'public_posts/b5'), ok({ createdAt: new Date(0) })));
-    await assertFails(setDoc(doc(db, 'public_posts/b6'), ok({ imageUrl: 'http://example.com/a.jpg' })));
-    await assertSucceeds(setDoc(doc(db, 'public_posts/b7'), ok({ imageUrl: 'https://example.com/a.jpg' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b6'), ok({ mediaUrl: 'http://example.com/a.mp4' })));
+    await assertSucceeds(setDoc(doc(db, 'public_posts/b7'), ok({ mediaUrl: 'https://example.com/a.mp4' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b8'), ok({ imageUrl: 'https://example.com/a.jpg' })));
+    await assertFails(setDoc(doc(db, 'public_posts/b9'), ok({ attachments: [] })));
+    await assertFails(setDoc(doc(db, 'public_posts/b10'), ok({ attachments: Array(11).fill('a.jpg') })));
   });
 
   it('events need a date and gallery posts need an image', async () => {
@@ -558,7 +561,7 @@ describe('public space (public_posts)', () => {
     await assertFails(setDoc(doc(db, 'public_posts/e1'), ok({ category: 'event' })));
     await assertSucceeds(setDoc(doc(db, 'public_posts/e2'), ok({ category: 'event', eventDate: Timestamp.fromDate(new Date('2027-03-01')) })));
     await assertFails(setDoc(doc(db, 'public_posts/g1'), ok({ category: 'gallery' })));
-    await assertSucceeds(setDoc(doc(db, 'public_posts/g2'), ok({ category: 'gallery', imageUrl: 'https://example.com/p.jpg' })));
+    await assertSucceeds(setDoc(doc(db, 'public_posts/g2'), ok({ category: 'gallery', attachments: ['1_p.jpg'] })));
   });
 
   it('principal and registrar approve or archive; nobody else can', async () => {
