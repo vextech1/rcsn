@@ -413,12 +413,14 @@ describe('deputy principal in the rest of the app', () => {
 
   it('the deputy moderates like the principal; custom-position staff cannot', async () => {
     const stamp = (uid, status) => ({ status, reviewedBy: uid, reviewedAt: serverTimestamp() });
-    await assertSucceeds(getDoc(doc(as('deputy1'), 'public_posts/pend1')));
-    await assertSucceeds(updateDoc(doc(as('deputy1'), 'public_posts/pend1'), stamp('deputy1', 'published')));
-    await assertSucceeds(deleteDoc(doc(as('deputy1'), 'public_posts/pub1')));
+    // Custom-position staff first: once the deputy publishes pend1 it is
+    // public and anyone could read it.
     await assertFails(getDoc(doc(as('askari1'), 'public_posts/pend1')));
     await assertFails(updateDoc(doc(as('askari1'), 'public_posts/pend1'), stamp('askari1', 'published')));
     await assertFails(deleteDoc(doc(as('askari1'), 'public_posts/pend1')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'public_posts/pend1')));
+    await assertSucceeds(updateDoc(doc(as('deputy1'), 'public_posts/pend1'), stamp('deputy1', 'published')));
+    await assertSucceeds(deleteDoc(doc(as('deputy1'), 'public_posts/pub1')));
   });
 });
 
