@@ -854,3 +854,62 @@ describe('first-run Principal setup', () => {
     await assertSucceeds(setDoc(doc(as('newtutor'), 'tutors/newtutor'), tutorDoc));
   });
 });
+
+describe('staff details edit', () => {
+  const details = (uid, fields) => ({
+    ...fields,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+
+  it('the principal can edit a registrar\'s name', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'New Name' })));
+  });
+
+  it('the deputy principal can edit a bursar\'s name', async () => {
+    await assertSucceeds(updateDoc(doc(as('deputy1'), 'staff/bursar1'), details('deputy1', { name: 'Better Name' })));
+  });
+
+  it('a custom-position staff member\'s position title can be changed', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'staff/askari1'), details('principal1', { name: 'Askari One', position: 'Gate Officer' })));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/askari1'), details('principal1', { position: 'X' })));
+  });
+
+  it('a built-in role cannot be given a position title', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'Reg', position: 'Boss' })));
+  });
+
+  it('email, role and status cannot change in an edit', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'Reg', email: 'other@example.com' })));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'Reg', role: 'principal' })));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'Reg', status: 'suspended' })));
+  });
+
+  it('the name must be 2 to 100 characters', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'A' })));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), details('principal1', { name: 'x'.repeat(101) })));
+  });
+
+  it('updatedBy must be the caller and updatedAt must be the server time', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), { name: 'Reg', updatedAt: serverTimestamp(), updatedBy: 'someoneelse' }));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/registrar1'), { name: 'Reg', updatedAt: new Date(), updatedBy: 'principal1' }));
+  });
+
+  it('nobody edits the principal\'s record, and nobody edits their own', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/principal1'), details('principal1', { name: 'Me' })));
+    await assertFails(updateDoc(doc(as('deputy1'), 'staff/principal1'), details('deputy1', { name: 'Hacked' })));
+    await assertFails(updateDoc(doc(as('deputy1'), 'staff/deputy1'), details('deputy1', { name: 'Me' })));
+  });
+
+  it('only the principal can edit the deputy principal\'s record', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'staff/deputy1'), details('principal1', { name: 'Deputy Renamed' })));
+    await assertFails(updateDoc(doc(as('deputy1'), 'staff/deputy2'), details('deputy1', { name: 'Other Deputy' })));
+  });
+
+  it('registrars, bursars, tutors and strangers cannot edit staff', async () => {
+    await assertFails(updateDoc(doc(as('registrar1'), 'staff/bursar1'), details('registrar1', { name: 'Nope' })));
+    await assertFails(updateDoc(doc(as('bursar1'), 'staff/registrar1'), details('bursar1', { name: 'Nope' })));
+    await assertFails(updateDoc(doc(as('tutor1'), 'staff/registrar1'), details('tutor1', { name: 'Nope' })));
+    await assertFails(updateDoc(doc(anon(), 'staff/registrar1'), { name: 'Nope' }));
+  });
+});

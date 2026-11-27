@@ -52,6 +52,34 @@ service cloud.firestore {
       return isPrincipalLevel() || isRegistrar();
     }
 
+    /// Principal or Deputy Principal editing someone else's details: the
+    /// name and, for custom-position staff, the position title. Never their
+    /// own record, never the Principal's record, and the Deputy Principal's
+    /// record only by the Principal. Email, role, status and everything
+    /// else stay untouched (the email is the login, which only the person
+    /// can change).
+    function isStaffDetailsEdit(staffId) {
+      return isPrincipalLevel()
+        && staffId != request.auth.uid
+        && resource.data.role != 'principal'
+        && (resource.data.role != 'deputyPrincipal' || isPrincipal())
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'position', 'updatedAt', 'updatedBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && (
+          (resource.data.role == 'staffMember'
+            && request.resource.data.position is string
+            && request.resource.data.position.size() >= 2
+            && request.resource.data.position.size() <= 60)
+          || (resource.data.role != 'staffMember'
+            && !('position' in request.resource.data))
+        )
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
     /// True once the school's Principal has registered (the `system/setup`
     /// marker exists). Until then NOBODY else may register anywhere: the
     /// tutor rules below require this.
@@ -187,24 +215,26 @@ service cloud.firestore {
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time);
 
-      // Suspend / reactivate: Principal or Deputy Principal, never
+      // Two kinds of update. (1) Suspend / reactivate / terminate. (2) Edit
+      // details (isStaffDetailsEdit). First kind: Principal or Deputy Principal, never
       // themselves, never the Principal record, and only the status stamp
       // fields may change. The Deputy's record is the exception: only the
       // Principal can touch it, and only to terminate (active -> suspended).
-      allow update: if isPrincipalLevel()
-        && staffId != request.auth.uid
-        && resource.data.role != 'principal'
-        && (
-          resource.data.role != 'deputyPrincipal'
-          || (isPrincipal()
-              && resource.data.status == 'active'
-              && request.resource.data.status == 'suspended')
-        )
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'updatedAt', 'updatedBy'])
-        && request.resource.data.status in ['active', 'suspended']
-        && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.updatedAt == request.time;
+      allow update: if (isPrincipalLevel()
+          && staffId != request.auth.uid
+          && resource.data.role != 'principal'
+          && (
+            resource.data.role != 'deputyPrincipal'
+            || (isPrincipal()
+                && resource.data.status == 'active'
+                && request.resource.data.status == 'suspended')
+          )
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'updatedAt', 'updatedBy'])
+          && request.resource.data.status in ['active', 'suspended']
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time)
+        || isStaffDetailsEdit(staffId);
 
       allow delete: if false;
     }
