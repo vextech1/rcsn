@@ -73,6 +73,10 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: assets/icons/app_icon.png
+  # Regenerating with `dart run flutter_launcher_icons` keeps the logo fitted:
+  # the legacy image is a padded rounded square, and the adaptive foreground
+  # already has the logo inside the safe zone (the full logo would be cropped
+  # by the circular mask). The uncropped logo is assets/icons/app_icon.png.
+  image_path: assets/icons/app_icon_legacy.png
   adaptive_icon_background: "#ffffff"
-  adaptive_icon_foreground: assets/icons/app_icon.png
+  adaptive_icon_foreground: assets/icons/app_icon_foreground.png
