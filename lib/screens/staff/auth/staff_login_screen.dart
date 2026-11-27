@@ -10,9 +10,9 @@ import '../../../widgets/forms/app_text_field.dart';
 ///
 /// [position] is what the person picked on the Staff screen. It is passed to
 /// [AuthProvider.signIn], which rejects the sign-in if the account is in a
-/// different position. It is null when the router sent someone here (for
-/// example a signed-out visit to a staff-only screen); the sign-in then works
-/// as before and the account alone decides the dashboard.
+/// different position. The router never opens this screen without one (it
+/// sends the person to the position list first), so a mismatch is always
+/// caught; null is only a safety net.
 ///
 /// Uses [AuthProvider.signIn], same as Tutor login. Which dashboard the
 /// person lands on is decided after sign-in by AuthProvider (reading the

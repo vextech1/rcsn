@@ -168,9 +168,9 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.staffPositions, builder: (_, __) => const StaffPositionScreen()),
       GoRoute(
         path: AppRoutes.staffLogin,
-        // The picked position travels as `extra`. It is null when the
-        // router sent the user here (a signed-out visit to a staff-only
-        // screen); sign-in then works without a position check.
+        // The picked position travels as `extra`. The guard never lets the
+        // login open without one, so the position check always applies;
+        // the null fallback below is only a safety net.
         builder: (_, state) {
           final extra = state.extra;
           return StaffLoginScreen(
@@ -265,7 +265,7 @@ String _staffHome(UserRole role) {
       return AppRoutes.staffHome;
     case UserRole.tutor:
     case UserRole.student:
-      return AppRoutes.staffLogin;
+      return AppRoutes.staffPositions;
   }
 }
 
@@ -344,6 +344,15 @@ String? _guard(
   if (isStaffLogin) {
     if (auth.isResolving) return null;
     if (auth.isUsableStaffSession) return _staffHome(auth.resolvedRole!);
+
+    // The login must always know which position the person is signing in
+    // as, so AuthProvider can reject a mismatch (e.g. Bursar credentials
+    // entered after choosing Registrar). Opening it without one (a
+    // redirect from a staff-only screen, a lost route state, a shared
+    // link) goes to the position list first.
+    if (path == AppRoutes.staffLogin && state.extra is! StaffPosition) {
+      return AppRoutes.staffPositions;
+    }
     return null;
   }
 
@@ -352,7 +361,7 @@ String? _guard(
   // ---------------------------------------------------------------
   if (isPrincipalRoute || isRegistrarRoute || isBursarRoute) {
     if (auth.isResolving) return null;
-    if (!auth.isUsableStaffSession) return AppRoutes.staffLogin;
+    if (!auth.isUsableStaffSession) return AppRoutes.staffPositions;
 
     final role = auth.resolvedRole!;
     // The Deputy Principal has the Principal's screens and access.
@@ -382,7 +391,7 @@ String? _guard(
   // ---------------------------------------------------------------
   if (isStaffHomeRoute) {
     if (auth.isResolving) return null;
-    if (!auth.isUsableStaffSession) return AppRoutes.staffLogin;
+    if (!auth.isUsableStaffSession) return AppRoutes.staffPositions;
     final role = auth.resolvedRole!;
     if (role != UserRole.staffMember) return _staffHome(role);
     return null;
