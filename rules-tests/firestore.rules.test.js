@@ -654,6 +654,8 @@ describe('timetables (Registrar builds, everyone reads published)', () => {
     await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('principal1')));
     await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { updatedAt: new Date(0) })));
     await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { rows: 99 })));
+  });
+});
 
 // ---------------------------------------------------------------------
 // First-run Principal setup. The seed above models a school that already
