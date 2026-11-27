@@ -57,7 +57,7 @@ class AppRoutes {
   static const String studentSearch = '/student/search';
   static const String studentDashboard = '/student/dashboard';
   static const String studentSubject = '/student/subject';
-  // Outside /student: parents and new students need only the payment code.
+  // Outside /student: parents need only the NSIN or the payment code.
   static const String feeLookup = '/fee-lookup';
   static const String studentFees = '/student/fees';
   static const String studentSettings = '/student/settings';

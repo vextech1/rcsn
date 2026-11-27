@@ -42,6 +42,28 @@ class FeeRepository {
   CollectionReference<Map<String, dynamic>> get _numbers =>
       _firestore.collection('fee_numbers');
 
+  /// Points an NSIN to its payment number, so either one opens the records.
+  DocumentReference<Map<String, dynamic>> _link(String nsin) =>
+      _firestore.collection('fee_links').doc(nsin.replaceAll('/', '_'));
+
+  /// The records for an NSIN, for parents and students (no sign-in).
+  Future<List<StudentFee>> findByNsin(String nsin) async {
+    final normalized = NsinValidator.normalize(nsin);
+    final String? number;
+    try {
+      final link = await _link(normalized)
+          .get(const GetOptions(source: Source.server));
+      number = link.data()?['paymentNumber'] as String?;
+    } on FirebaseException {
+      throw const FeeFailure(
+        'Could not load the fees. Check your connection and try again.',
+      );
+    }
+    if (number == null) return [];
+    final records = await findByNumber(number);
+    return records.where((f) => f.nsin == normalized).toList();
+  }
+
   /// The payment number already attached to this student, if any.
   Future<String?> numberFor(String nsin) async {
     if (nsin.trim().isEmpty) return null;
@@ -122,6 +144,12 @@ class FeeRepository {
               'This student already has a record for that semester.',
             );
           }
+          // All reads must come before the first write.
+          final needsLink = normalized.isNotEmpty &&
+              !(await tx.get(_link(normalized))).exists;
+          if (needsLink) {
+            tx.set(_link(normalized), {'paymentNumber': number, ..._stamp()});
+          }
           if (!owner.exists) {
             tx.set(numberRef, {'nsin': normalized, ..._stamp()});
           }
@@ -155,6 +183,10 @@ class FeeRepository {
       final batch = _firestore.batch()
         ..update(_numbers.doc(paymentNumber), {
           'nsin': normalized,
+          ..._stamp(),
+        })
+        ..set(_link(normalized), {
+          'paymentNumber': paymentNumber,
           ..._stamp(),
         });
       for (final doc in records.docs) {

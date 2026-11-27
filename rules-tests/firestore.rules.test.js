@@ -655,7 +655,7 @@ describe('student fees', () => {
     }
     await assertFails(getDocs(collection(as('tutor1'), 'student_fees')));
   });
-  it('a student reads by payment number but cannot list, search or write', async () => {
+  it('parents read by payment number but cannot list, search or write', async () => {
     await assertSucceeds(open());
     await assertSucceeds(pay(400, 400));
     const db = env.unauthenticatedContext().firestore();
@@ -665,7 +665,7 @@ describe('student fees', () => {
     await assertFails(getDocs(query(collection(db, 'student_fees'),
       where('nsin', '==', 'JAN26/U028/MCK/001'))));
     await assertFails(getDoc(doc(db, 'fee_numbers/PN12345')));
-    await assertFails(getDocs(collection(db, `${feePath}/payments`)));
+    await assertSucceeds(getDocs(collection(db, `${feePath}/payments`)));
     await assertFails(updateDoc(doc(db, feePath), { tuition: 1 }));
   });
   it('records payments and negative corrections', async () => {
@@ -698,6 +698,16 @@ describe('student fees', () => {
     await assertFails(attach('nonsense'));
     await assertSucceeds(attach('JAN26/U028/MCK/001'));
     await assertFails(attach('JAN26/U028/MCK/002'));
+  });
+  it('links an NSIN only to its own payment number', async () => {
+    await assertSucceeds(open());
+    const link = (id, paymentNumber = 'PN12345') =>
+      setDoc(doc(as('bursar1'), `fee_links/${id}`), { paymentNumber, ...stamp('bursar1') });
+    await assertFails(link('JAN26_U028_MCK_002'));
+    await assertSucceeds(link('JAN26_U028_MCK_001'));
+    const db = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'fee_links/JAN26_U028_MCK_001')));
+    await assertFails(getDocs(collection(db, 'fee_links')));
   });
   it('never deletes', async () => {
     await assertSucceeds(open());

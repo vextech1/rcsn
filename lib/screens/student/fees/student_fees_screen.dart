@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/utils/money.dart';
+import '../../../core/utils/nsin_validator.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../providers/student_provider.dart';
@@ -10,64 +12,72 @@ import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/forms/app_text_field.dart';
 import '../../bursar/fee_status_label.dart';
 
-/// The student enters the payment code they were given and sees what the
-/// Bursar holds: name, program and tuition for each semester. Read-only. The
-/// code is deliberately not saved, because students share phones.
+/// A student's fee details, read-only. Parents open it without signing in and
+/// enter either the NSIN or the payment code; a signed-in student sees theirs
+/// straight away. Nothing is saved, because phones get shared.
 class StudentFeesScreen extends StatefulWidget {
-  /// True when opened without signing in: a parent, or a new student with no
-  /// NSIN yet. The school-issued code alone is enough.
-  final bool codeOnly;
+  /// True when opened without signing in.
+  final bool lookup;
 
-  const StudentFeesScreen({super.key, this.codeOnly = false});
+  const StudentFeesScreen({super.key, this.lookup = false});
 
   @override
   State<StudentFeesScreen> createState() => _StudentFeesScreenState();
 }
 
 class _StudentFeesScreenState extends State<StudentFeesScreen> {
-  final _number = TextEditingController();
+  final _input = TextEditingController();
   List<StudentFee>? _fees;
   AppFailure? _error;
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (!widget.lookup) {
+      _input.text =
+          context.read<StudentProvider>().currentStudent?.nsin ?? '';
+      _show();
+    }
+  }
+
+  @override
   void dispose() {
-    _number.dispose();
+    _input.dispose();
     super.dispose();
   }
 
   Future<void> _show() async {
-    final problem = StudentFee.numberError(_number.text);
+    // An NSIN has slashes; a payment code never does.
+    final isNsin = _input.text.contains('/');
+    final problem = isNsin
+        ? NsinValidator.errorMessage(_input.text)
+        : StudentFee.numberError(_input.text);
     if (problem != null) {
       setState(() {
         _fees = null;
-        _error = UnknownFailure(problem);
+        _error = const FeeFailure('Enter a valid NSIN or payment code.');
       });
       return;
     }
-    final nsin = widget.codeOnly
-        ? null
-        : context.read<StudentProvider>().currentStudent?.nsin;
     setState(() {
       _busy = true;
       _fees = null;
       _error = null;
     });
     try {
-      final found = await FeeRepository().findByNumber(_number.text);
-      // The code alone shows its records. A signed-in student sees only their
-      // own, including any not yet linked to an NSIN.
-      final own = found
-          .where((f) => widget.codeOnly || f.nsin.isEmpty || f.nsin == nsin)
-          .toList();
+      final repository = FeeRepository();
+      final found = isNsin
+          ? await repository.findByNsin(_input.text)
+          : await repository.findByNumber(_input.text);
       if (!mounted) return;
       setState(() {
-        if (own.isEmpty) {
+        if (found.isEmpty) {
           _error = const FeeFailure(
-            'Nothing found for that payment code. Check it or ask the Bursar.',
+            'No fees found. Check the number or ask the Bursar.',
           );
         } else {
-          _fees = own;
+          _fees = found;
         }
       });
     } on AppFailure catch (e) {
@@ -81,16 +91,16 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.codeOnly ? 'Fees' : 'My fees'),
+        title: Text(widget.lookup ? 'Student fees' : 'My fees'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          AppTextField(controller: _number, label: 'Payment code'),
+          AppTextField(controller: _input, label: 'NSIN or payment code'),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _busy ? null : _show,
-            child: Text(_busy ? 'Loading…' : 'Show my fees'),
+            child: Text(_busy ? 'Loading…' : 'Show fees'),
           ),
           if (_error != null) AppInlineError(failure: _error!),
           for (final fee in _fees ?? <StudentFee>[])
@@ -106,6 +116,8 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(fee.name),
+                    Text(fee.nsin.isEmpty ? 'No NSIN yet' : fee.nsin),
+                    Text('Payment code: ${fee.paymentNumber}'),
                     Text(kTrackDefinitions[fee.programType]?.label ??
                         fee.programType.name),
                     const SizedBox(height: 8),
@@ -117,6 +129,7 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
                     ),
                     const SizedBox(height: 8),
                     FeeStatusLabel(fee.status),
+                    _PaymentHistory(key: ValueKey(fee.id), feeId: fee.id),
                   ],
                 ),
               ),
@@ -125,4 +138,42 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
       ),
     );
   }
+}
+
+/// Loaded only when opened, to save reads.
+class _PaymentHistory extends StatelessWidget {
+  final String feeId;
+  const _PaymentHistory({super.key, required this.feeId});
+
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: const Text('Payments'),
+        children: [
+          StreamBuilder<List<FeePayment>>(
+            stream: FeeRepository().watchPayments(feeId),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Text('Could not load the payments.');
+              }
+              final payments = snapshot.data;
+              if (payments == null) return const Text('Loading…');
+              if (payments.isEmpty) return const Text('No payments recorded.');
+              return Column(
+                children: [
+                  for (final p in payments)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(formatUgx(p.amount)),
+                      subtitle: Text(
+                        '${p.method.label} · ${p.reference}'
+                        '${p.recordedAt == null ? '' : '\n${DateFormat('d MMM yyyy').format(p.recordedAt!)}'}',
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      );
 }

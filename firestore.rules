@@ -574,9 +574,11 @@ service cloud.firestore {
     // student_fees — tuition per student per semester, kept by the Bursar
     // -------------------------------------------------------------------
     //
-    // Students have no sign-in. Knowing the payment number is what lets them
-    // read a record: the id starts with it, single reads are open and listing
-    // is staff-only. Nothing is ever deleted, and `paid` only moves together
+    // Parents and students have no sign-in. By school decision, knowing the
+    // payment number OR the NSIN is enough to read a student's records and
+    // payments. Record ids start with the number, fee_links turns an NSIN into
+    // the number, single reads are open and listing records is staff-only.
+    // NSINs are sequential, so this is weak protection (docs/BURSAR.md). Nothing is ever deleted, and `paid` only moves together
     // with a new payment of the same amount.
 
     // Which student owns a payment number. A new student may have no NSIN yet
@@ -596,6 +598,18 @@ service cloud.firestore {
              .hasOnly(['nsin', 'updatedBy', 'updatedAt'])
         && isFeeStamp();
       allow delete: if false;
+    }
+
+    match /fee_links/{linkId} {
+      allow get: if true;
+      allow list: if isBursar();
+      allow create: if isBursar()
+        && request.resource.data.keys().hasOnly(
+             ['paymentNumber', 'updatedBy', 'updatedAt'])
+        && getAfter(/databases/$(database)/documents/fee_numbers/$(request.resource.data.paymentNumber))
+             .data.nsin.replace('/', '_') == linkId
+        && isFeeStamp();
+      allow update, delete: if false;
     }
 
     match /student_fees/{feeId} {
@@ -660,7 +674,8 @@ service cloud.firestore {
       allow delete: if false;
 
       match /payments/{paymentId} {
-        allow read: if isBursar() || isPrincipalLevel();
+        // Readable by anyone who knows the record's id (see above).
+        allow read: if true;
 
         // Only valid when the parent record points at this entry in the
         // same write, which makes the parent rule check the amount.

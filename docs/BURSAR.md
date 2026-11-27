@@ -19,8 +19,9 @@ Status: Not paid, Balance due, Cleared (balance zero or less).
 
 - Bursar: read, open records, change tuition, record payments.
 - Principal and Deputy Principal: read only.
-- Students (no sign-in): read a record only by its id, which needs the payment
-  number. No listing, searching, payment history or writing.
+- Parents and students (no sign-in): the NSIN or the payment code opens that
+  student's records and payment history. No listing, searching or writing.
+  `fee_links/{NSIN with _ for /}` holds the payment code for an NSIN.
 - Registrar, tutors and other staff cannot list records.
 - `paid` changes only together with a new payment of the same amount.
 - Payments and records are never deleted or edited. Fix mistakes with a
@@ -30,17 +31,16 @@ Status: Not paid, Balance due, Cleared (balance zero or less).
 
 1. Bursar screens: list, search, filter, totals, add student, record payment,
    history. **Built.**
-2. Fee view: **My fees** after NSIN sign-in, or **Parent or no NSIN? Use
-   payment code** on the sign-in screen. The school-issued code alone shows the
-   balance. **Built.**
+2. Fee view: **Parents: check fees** on the sign-in screen (NSIN or code), or
+   **My fees** after sign-in. **Built.**
 3. Principal read-only screen.
 4. Later: bulk tuition per class, CSV export, printable clearance.
 
 ## Known gaps
 
-- Anyone who knows or guesses a payment number can read that record. Short or
-  sequential numbers are weak. Accepted: the school issues the codes, and
-  parents need to use them.
+- **Privacy (school decision):** NSINs are sequential and the `students`
+  collection is publicly readable, so anyone with technical skill or a guessed
+  NSIN can see any student's fees and payments. Revisit before real data.
 - A wrongly typed payment number cannot be changed in the app.
 - A record's name, NSIN and semester cannot be edited after saving.
 - A mistyped NSIN stops the student seeing the record.

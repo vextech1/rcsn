@@ -168,7 +168,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                     ? null
                     : () => context.push(AppRoutes.feeLookup),
                 icon: const Icon(Icons.payments),
-                label: const Text('Parent or no NSIN? Use payment code'),
+                label: const Text('Parents: check fees (NSIN or code)'),
               ),
 
               const SizedBox(height: 12),

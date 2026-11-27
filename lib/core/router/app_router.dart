@@ -184,7 +184,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.studentSearch, builder: (_, __) => const StudentSearchScreen()),
       GoRoute(path: AppRoutes.studentDashboard, builder: (_, __) => const StudentDashboardScreen()),
       GoRoute(path: AppRoutes.studentSubject, builder: (_, __) => const StudentSubjectScreen()),
-      GoRoute(path: AppRoutes.feeLookup, builder: (_, __) => const StudentFeesScreen(codeOnly: true)),
+      GoRoute(path: AppRoutes.feeLookup, builder: (_, __) => const StudentFeesScreen(lookup: true)),
       GoRoute(path: AppRoutes.studentFees, builder: (_, __) => const StudentFeesScreen()),
       GoRoute(path: AppRoutes.studentSettings, builder: (_, __) => const StudentSettingsScreen()),
       GoRoute(path: AppRoutes.studentAccountInactive, builder: (_, __) => const StudentAccountInactiveScreen()),
