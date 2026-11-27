@@ -24,7 +24,6 @@ const {
   query,
   where,
   Timestamp,
-  writeBatch,
 } = require('firebase/firestore');
 
 let env;
