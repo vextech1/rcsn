@@ -4,10 +4,15 @@
 # failed step can be diagnosed from the check-run annotations API.
 title="$1"; log="$2"
 {
+  # Mocha's pass/fail summary (with the names of failing tests) goes first:
+  # the annotation is truncated, and the summary is otherwise buried under
+  # thousands of Firestore stream lines.
+  echo "=== TEST SUMMARY ==="
+  awk '/ passing/{f=1} f' "$log" | grep -v -E "GrpcConnection|evaluation error|^false for" | head -40
   echo "=== ERROR LINES ==="
-  grep -n -E "^e: |error:|Error:|What went wrong|FAILURE|Execution failed|Could not|not found|Unresolved|Exception|failing|AssertionError|FAIL" "$log" | head -60
+  grep -v -E "GrpcConnection|evaluation error|^false for" "$log" | grep -n -E "^e: |error:|Error:|What went wrong|FAILURE|Execution failed|Could not|not found|Unresolved|Exception|failing|AssertionError|FAIL" | head -40
   echo "=== TAIL ==="
-  tail -60 "$log"
+  grep -v -E "GrpcConnection|evaluation error|^false for" "$log" | tail -50
 } > /tmp/summary.txt
 msg=$(python3 -c "import urllib.parse;print(urllib.parse.quote(open('/tmp/summary.txt').read()[:12000],safe=' /:.,;()[]{}<>=-_\\'\"'))")
 echo "::error title=${title}::${msg}"

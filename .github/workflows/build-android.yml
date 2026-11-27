@@ -87,14 +87,11 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          {
-            echo "=== ERROR LINES ==="
-            grep -n -E "^e: |error:|What went wrong|FAILURE|Execution failed|Could not|not found|Unresolved|Exception" build.log | head -60
-            echo "=== TAIL ==="
-            tail -60 build.log
-          } > summary.txt
-          msg=$(python3 -c "import urllib.parse;print(urllib.parse.quote(open('summary.txt').read()[:12000],safe=' /:.,;()[]{}<>=-_\\'\"'))")
-          echo "::error title=BUILD-LOG::${msg}"
+          # The shared script is the one the rules job uses; the inline
+          # version here had broken quoting and itself exited non-zero, so
+          # the compile error never reached the annotations.
+          cp build.log ci.log
+          .github/scripts/annotate-failure.sh BUILD-LOG ci.log
 
       - uses: actions/upload-artifact@v4
         with:
