@@ -12,7 +12,8 @@ import '../../providers/auth_provider.dart';
 /// "Staff" is the shared login for Principal, Registrar and Bursar; which
 /// dashboard they land on is decided after sign-in from their `staff`
 /// record. There is no pre-sign-in "does an admin exist" check any more:
-/// the Principal is created by a one-time bootstrap script, never in-app.
+/// the Principal registers themselves on first run (see
+/// PrincipalSetupScreen), and until then the router shows only that screen.
 ///
 /// NOTE ON THEME: like the welcome screen this is deliberately a fixed
 /// brand-colour hero screen regardless of system light/dark mode: solid

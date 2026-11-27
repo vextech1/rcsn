@@ -26,7 +26,6 @@ jobs:
         shell: bash
         run: |
           node --check functions/index.js
-          node --check tools/bootstrap-principal.js
 
       - name: Storage Worker tests
         run: cd worker && npm install --no-audit --no-fund && npm test

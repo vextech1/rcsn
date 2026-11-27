@@ -7,7 +7,7 @@ enum StaffStatus { active, suspended }
 ///
 /// Document ID = Firebase Auth uid. The Principal's app creates Registrar
 /// and Bursar records and flips their status; the first Principal record is
-/// created out-of-band (tools/bootstrap-principal.js). What each caller may
+/// created by the Principal registering themselves on first run. What each caller may
 /// write is enforced by the `staff` rules in firestore.rules.
 class StaffAccount {
   final String id;

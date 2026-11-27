@@ -52,6 +52,40 @@ service cloud.firestore {
       return isPrincipalLevel() || isRegistrar();
     }
 
+    /// True once the school's Principal has registered (the `system/setup`
+    /// marker exists). Until then NOBODY else may register anywhere: the
+    /// tutor rules below require this.
+    function setupDone() {
+      return exists(/databases/$(database)/documents/system/setup);
+    }
+
+    /// The very first Principal registering themselves from the app.
+    /// Allowed only while no setup marker exists, only for the caller's own
+    /// uid, and only as the same atomic batch that creates the marker
+    /// (existsAfter/getAfter), so a Principal record can never exist
+    /// without the marker. Once the marker exists this is false forever.
+    function isFirstPrincipalCreate(staffId) {
+      return request.auth != null
+        && request.auth.uid == staffId
+        && !setupDone()
+        && existsAfter(/databases/$(database)/documents/system/setup)
+        && getAfter(/databases/$(database)/documents/system/setup)
+             .data.principalUid == staffId
+        && request.resource.data.keys().hasAll(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.matches('.+@.+[.].+')
+        && request.resource.data.role == 'principal'
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdBy == staffId
+        && request.resource.data.createdAt == request.time;
+    }
+
     /// True if the requesting user has an active Tutor account.
     /// The tutor document ID MUST equal the Firebase Auth UID — this is
     /// enforced at creation time (see tutors.create below).
@@ -109,8 +143,9 @@ service cloud.firestore {
     //     a Deputy record is never reactivated, a new one is appointed.
     //   - Nobody can create another principal, change the Principal record,
     //     change their own status, or delete staff.
-    //   - The first Principal is created out-of-band
-    //     (tools/bootstrap-principal.js or by hand in the console).
+    //   - The first Principal registers themselves from the app (see
+    //     isFirstPrincipalCreate and system/setup); nobody else can
+    //     register until then.
     //
     // Suspension is enforced here, live on every request (isStaff() reads
     // status), and by the app signing a suspended user out.
@@ -123,33 +158,34 @@ service cloud.firestore {
         && (request.auth.uid == staffId || isPrincipalLevel());
       allow list: if isPrincipalLevel();
 
-      allow create: if isPrincipalLevel()
-        && request.resource.data.keys().hasAll(
-             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
-        && request.resource.data.keys().hasOnly(
-             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy',
-              'position'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 100
-        && request.resource.data.email is string
-        && request.resource.data.email.matches('.+@.+[.].+')
-        && (
-          request.resource.data.role in ['registrar', 'bursar', 'staffMember']
-          || (request.resource.data.role == 'deputyPrincipal' && isPrincipal())
-        )
-        && (
-          (request.resource.data.role == 'staffMember'
-            && 'position' in request.resource.data
-            && request.resource.data.position is string
-            && request.resource.data.position.size() >= 2
-            && request.resource.data.position.size() <= 60)
-          || (request.resource.data.role != 'staffMember'
-            && !('position' in request.resource.data))
-        )
-        && request.resource.data.status == 'active'
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time;
+      allow create: if isFirstPrincipalCreate(staffId)
+        || (isPrincipalLevel()
+          && request.resource.data.keys().hasAll(
+               ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+          && request.resource.data.keys().hasOnly(
+               ['name', 'email', 'role', 'status', 'createdAt', 'createdBy',
+                'position'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 2
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.email is string
+          && request.resource.data.email.matches('.+@.+[.].+')
+          && (
+            request.resource.data.role in ['registrar', 'bursar', 'staffMember']
+            || (request.resource.data.role == 'deputyPrincipal' && isPrincipal())
+          )
+          && (
+            (request.resource.data.role == 'staffMember'
+              && 'position' in request.resource.data
+              && request.resource.data.position is string
+              && request.resource.data.position.size() >= 2
+              && request.resource.data.position.size() <= 60)
+            || (request.resource.data.role != 'staffMember'
+              && !('position' in request.resource.data))
+          )
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time);
 
       // Suspend / reactivate: Principal or Deputy Principal, never
       // themselves, never the Principal record, and only the status stamp
@@ -287,8 +323,74 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
+    // timetables — class and exam timetables, school and semester calendars
+    // -------------------------------------------------------------------
+    //
+    // Built by the Academic Registrar in a spreadsheet-style editor. One
+    // document holds the whole grid (title, boxes, footnotes), so a save is
+    // one atomic write. Only the Registrar creates, edits, publishes and
+    // deletes. The Principal and Deputy Principal can read everything,
+    // drafts included, but not change it. Everyone else (students, tutors,
+    // the public) reads published timetables. `audience` only decides where
+    // a timetable is LISTED in the app; any published one is readable by
+    // anyone holding the app's public key until students get real sessions
+    // (Phase 5).
+
+    match /timetables/{timetableId} {
+      function validTimetable(d) {
+        return d.keys().hasAll(
+               ['title', 'type', 'audience', 'status', 'rows', 'cols',
+                'colWidths', 'cells', 'footnotes', 'createdBy', 'createdAt',
+                'updatedAt', 'updatedBy'])
+          && d.keys().hasOnly(
+               ['title', 'type', 'audience', 'status', 'rows', 'cols',
+                'colWidths', 'cells', 'footnotes', 'createdBy', 'createdAt',
+                'updatedAt', 'updatedBy', 'subtitle', 'academicYear',
+                'programType', 'year', 'semester', 'publishedAt'])
+          && d.title is string && d.title.size() >= 3 && d.title.size() <= 120
+          && d.type in ['class', 'exam', 'calendar', 'semester_calendar', 'custom']
+          && d.audience in ['everyone', 'students', 'staff']
+          && d.status in ['draft', 'published']
+          && d.rows is int && d.rows >= 1 && d.rows <= 60
+          && d.cols is int && d.cols >= 1 && d.cols <= 20
+          && d.colWidths is list && d.colWidths.size() == d.cols
+          && d.cells is map
+          && d.footnotes is list && d.footnotes.size() <= 12
+          && (!('subtitle' in d)
+              || (d.subtitle is string && d.subtitle.size() <= 200))
+          && (!('academicYear' in d)
+              || (d.academicYear is string && d.academicYear.size() <= 20))
+          && (!('programType' in d) || d.programType is string)
+          && (!('year' in d) || (d.year is int && d.year >= 0 && d.year <= 3))
+          && (!('semester' in d)
+              || (d.semester is int && d.semester >= 0 && d.semester <= 2))
+          && (!('publishedAt' in d) || d.publishedAt is timestamp);
+      }
+
+      allow read: if resource.data.status == 'published'
+        || isRegistrar()
+        || isPrincipalLevel();
+
+      allow create: if isRegistrar()
+        && validTimetable(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isRegistrar()
+        && validTimetable(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow delete: if isRegistrar();
+    }
+
+    // -------------------------------------------------------------------
     // admins — RETIRED. Replaced by `staff`. Locked entirely; the legacy
-    // document is migrated by bootstrap-principal.js --from-admin.
+    // document is no longer used.
     // -------------------------------------------------------------------
 
     match /admins/{adminId} {
@@ -309,6 +411,7 @@ service cloud.firestore {
       // a different UID. The incoming document must set status to
       // 'active' — no self-creating with 'suspended' or 'terminated'.
       allow create: if request.auth != null
+        && setupDone()
         && request.auth.uid == tutorId
         && request.resource.data.status == 'active'
         && request.resource.data.name is string
@@ -684,6 +787,34 @@ service cloud.firestore {
     }
 
     // fee_attempts (the Worker's guess counter) has no rule: apps are denied.
+
+    // -------------------------------------------------------------------
+    // system/setup — "the school has a Principal" marker
+    // -------------------------------------------------------------------
+    //
+    // Anyone may read it (the app checks it at launch, before sign-in) but
+    // nobody can list the collection. It is created exactly once, by the
+    // first Principal, in the same batch as their own staff record; after
+    // that it can never be changed or deleted from a client.
+
+    match /system/{docId} {
+      allow get: if docId == 'setup';
+      allow list: if false;
+
+      allow create: if docId == 'setup'
+        && request.auth != null
+        && request.resource.data.keys().hasAll(['principalUid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['principalUid', 'createdAt'])
+        && request.resource.data.principalUid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && existsAfter(
+             /databases/$(database)/documents/staff/$(request.auth.uid))
+        && getAfter(
+             /databases/$(database)/documents/staff/$(request.auth.uid))
+             .data.role == 'principal';
+
+      allow update, delete: if false;
+    }
 
     // -------------------------------------------------------------------
     // Default deny — anything not explicitly matched above is blocked

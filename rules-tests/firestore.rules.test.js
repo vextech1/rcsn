@@ -20,6 +20,7 @@ const {
   deleteDoc,
   collection,
   serverTimestamp,
+  writeBatch,
   query,
   where,
   Timestamp,
@@ -58,6 +59,7 @@ beforeEach(async () => {
       role,
       status,
     });
+    await setDoc(doc(db, 'system/setup'), { principalUid: 'principal1', createdAt: new Date() });
     await setDoc(doc(db, 'staff/principal1'), staff('Principal', 'principal'));
     await setDoc(doc(db, 'staff/registrar1'), staff('Registrar', 'registrar'));
     await setDoc(doc(db, 'staff/registrar2'), staff('Suspended', 'registrar', 'suspended'));
@@ -72,6 +74,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'tutor_assignments/tutor2_s1'), { tutorId: 'tutor2', subjectId: 's1' });
     await setDoc(doc(db, 'public_posts/pub1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'published', createdAt: new Date() });
     await setDoc(doc(db, 'public_posts/pend1'), { ...basePost('tutor1', 'T', 'tutor'), status: 'pending', createdAt: new Date() });
+    await setDoc(doc(db, 'timetables/tt_draft'), { ...ttBase('registrar1'), status: 'draft', createdAt: new Date(), updatedAt: new Date() });
+    await setDoc(doc(db, 'timetables/tt_pub'), { ...ttBase('registrar1'), status: 'published', createdAt: new Date(), updatedAt: new Date() });
     await setDoc(doc(db, 'subjects/s1'), subject);
     await setDoc(doc(db, 'content_types/ct1'), { name: 'Notes' });
     await setDoc(doc(db, 'content_items/existing1'), {
@@ -112,6 +116,34 @@ const newPost = (authorId, authorName, authorRole, status, extra = {}) => ({
   ...basePost(authorId, authorName, authorRole),
   status,
   createdAt: serverTimestamp(),
+  ...extra,
+});
+
+const ttBase = (uid) => ({
+  title: 'Class Timetable',
+  type: 'class',
+  audience: 'students',
+  status: 'draft',
+  rows: 2,
+  cols: 2,
+  colWidths: [120, 120],
+  cells: { r0c0: { t: 'Time', B: true } },
+  footnotes: [],
+  createdBy: uid,
+  updatedBy: uid,
+});
+
+const newTimetable = (uid, extra = {}) => ({
+  ...ttBase(uid),
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...extra,
+});
+
+const ttEdit = (uid, extra = {}) => ({
+  title: 'Edited title',
+  updatedAt: serverTimestamp(),
+  updatedBy: uid,
   ...extra,
 });
 
@@ -647,5 +679,164 @@ describe('student fees', () => {
     await assertSucceeds(pay(400, 400));
     await assertFails(deleteDoc(doc(as('bursar1'), feePath)));
     await assertFails(deleteDoc(doc(as('bursar1'), `${feePath}/payments/p1`)));
+  });
+});
+
+describe('timetables (Registrar builds, everyone reads published)', () => {
+  const publishedQuery = (db) =>
+    query(collection(db, 'timetables'), where('status', '==', 'published'));
+
+  it('anyone can read a published timetable, signed in or not', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'timetables/tt_pub')));
+    await assertSucceeds(getDocs(publishedQuery(anon())));
+    await assertSucceeds(getDoc(doc(as('tutor1'), 'timetables/tt_pub')));
+  });
+
+  it('drafts are hidden from the public, tutors and the bursar', async () => {
+    await assertFails(getDoc(doc(anon(), 'timetables/tt_draft')));
+    await assertFails(getDocs(collection(anon(), 'timetables')));
+    await assertFails(getDoc(doc(as('tutor1'), 'timetables/tt_draft')));
+    await assertFails(getDoc(doc(as('bursar1'), 'timetables/tt_draft')));
+  });
+
+  it('the registrar, principal and deputy can read drafts', async () => {
+    await assertSucceeds(getDoc(doc(as('registrar1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'timetables/tt_draft')));
+    await assertSucceeds(getDocs(collection(as('registrar1'), 'timetables')));
+  });
+
+  it('only the registrar can create a timetable', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'timetables/new1'), newTimetable('registrar1')));
+    await assertFails(setDoc(doc(as('principal1'), 'timetables/new2'), newTimetable('principal1')));
+    await assertFails(setDoc(doc(as('deputy1'), 'timetables/new3'), newTimetable('deputy1')));
+    await assertFails(setDoc(doc(as('bursar1'), 'timetables/new4'), newTimetable('bursar1')));
+    await assertFails(setDoc(doc(as('tutor1'), 'timetables/new5'), newTimetable('tutor1')));
+    await assertFails(setDoc(doc(as('registrar2'), 'timetables/new6'), newTimetable('registrar2')));
+    await assertFails(setDoc(doc(anon(), 'timetables/new7'), newTimetable('registrar1')));
+  });
+
+  it('a timetable must be well-formed', async () => {
+    const db = as('registrar1');
+    const bad = (extra) => setDoc(doc(db, 'timetables/bad'), newTimetable('registrar1', extra));
+    await assertFails(bad({ title: 'Hi' }));
+    await assertFails(bad({ type: 'weird' }));
+    await assertFails(bad({ audience: 'nobody' }));
+    await assertFails(bad({ rows: 0 }));
+    await assertFails(bad({ rows: 61 }));
+    await assertFails(bad({ cols: 21, colWidths: new Array(21).fill(100) }));
+    await assertFails(bad({ colWidths: [120] }));
+    await assertFails(bad({ extra: 1 }));
+    await assertFails(bad({ createdBy: 'someone-else' }));
+    await assertFails(bad({ createdAt: new Date(0) }));
+    await assertFails(bad({ footnotes: new Array(13).fill('x') }));
+    await assertSucceeds(bad({ subtitle: 'Year 1', academicYear: '2026/27', programType: 'certificateNursing', year: 1, semester: 2 }));
+  });
+
+  it('the registrar can edit, publish and delete; nobody else can', async () => {
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'timetables/tt_draft'), ttEdit('registrar1')));
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'timetables/tt_draft'), ttEdit('registrar1', { status: 'published', publishedAt: serverTimestamp() })));
+    await assertFails(updateDoc(doc(as('principal1'), 'timetables/tt_pub'), ttEdit('principal1')));
+    await assertFails(updateDoc(doc(as('deputy1'), 'timetables/tt_pub'), ttEdit('deputy1')));
+    await assertFails(updateDoc(doc(as('registrar2'), 'timetables/tt_pub'), ttEdit('registrar2')));
+    await assertFails(updateDoc(doc(as('tutor1'), 'timetables/tt_pub'), ttEdit('tutor1')));
+    await assertFails(updateDoc(doc(anon(), 'timetables/tt_pub'), ttEdit('registrar1')));
+    await assertSucceeds(deleteDoc(doc(as('registrar1'), 'timetables/tt_draft')));
+    await assertFails(deleteDoc(doc(as('principal1'), 'timetables/tt_pub')));
+    await assertFails(deleteDoc(doc(anon(), 'timetables/tt_pub')));
+  });
+
+  it('edits cannot rewrite who created it or when, or spoof the editor', async () => {
+    const db = as('registrar1');
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { createdBy: 'principal1' })));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('principal1')));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { updatedAt: new Date(0) })));
+    await assertFails(updateDoc(doc(db, 'timetables/tt_pub'), ttEdit('registrar1', { rows: 99 })));
+  });
+});
+
+// ---------------------------------------------------------------------
+// First-run Principal setup. The seed above models a school that already
+// has its Principal (system/setup exists); these tests remove the marker
+// to model a brand-new, empty school.
+// ---------------------------------------------------------------------
+describe('first-run Principal setup', () => {
+  const principalRecord = (uid) => ({
+    name: 'Grace Namuli',
+    email: 'grace@example.com',
+    role: 'principal',
+    status: 'active',
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+  });
+  const marker = (uid) => ({ principalUid: uid, createdAt: serverTimestamp() });
+
+  const freshSchool = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'system/setup'));
+    });
+
+  const register = (uid, record = principalRecord(uid), mark = marker(uid)) => {
+    const db = as(uid);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'system/setup'), mark);
+    batch.set(doc(db, 'staff/' + uid), record);
+    return batch.commit();
+  };
+
+  it('anyone can read the setup marker but nobody can list or list-read system', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'system/setup')));
+    await assertFails(getDocs(collection(anon(), 'system')));
+    await assertFails(getDoc(doc(anon(), 'system/other')));
+  });
+
+  it('on a fresh school, a new user registers as Principal in one batch', async () => {
+    await freshSchool();
+    await assertSucceeds(register('newprincipal'));
+  });
+
+  it('the marker alone, or the Principal record alone, is refused', async () => {
+    await freshSchool();
+    await assertFails(setDoc(doc(as('newprincipal'), 'system/setup'), marker('newprincipal')));
+    await assertFails(setDoc(doc(as('newprincipal'), 'staff/newprincipal'), principalRecord('newprincipal')));
+  });
+
+  it('cannot register for someone else, or with a marker naming someone else', async () => {
+    await freshSchool();
+    const db = as('attacker');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'system/setup'), marker('victim'));
+    batch.set(doc(db, 'staff/victim'), principalRecord('victim'));
+    await assertFails(batch.commit());
+    await assertFails(register('attacker', principalRecord('attacker'), marker('someoneelse')));
+  });
+
+  it('the record must be a clean active principal, not another role or extra fields', async () => {
+    await freshSchool();
+    await assertFails(register('u1', { ...principalRecord('u1'), role: 'registrar' }));
+    await assertFails(register('u2', { ...principalRecord('u2'), status: 'suspended' }));
+    await assertFails(register('u3', { ...principalRecord('u3'), position: 'Boss' }));
+    await assertFails(register('u4', { ...principalRecord('u4'), createdBy: 'someoneelse' }));
+  });
+
+  it('once the school is set up, nobody can register as Principal again', async () => {
+    await assertFails(register('latecomer'));
+    await assertFails(setDoc(doc(as('latecomer'), 'staff/latecomer'), principalRecord('latecomer')));
+  });
+
+  it('the marker cannot be edited or deleted, even by the Principal', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'system/setup'), { principalUid: 'principal1' }));
+    await assertFails(deleteDoc(doc(as('principal1'), 'system/setup')));
+    await assertFails(setDoc(doc(as('principal1'), 'system/setup'), marker('principal1')));
+  });
+
+  it('tutors cannot register until the Principal has set the school up', async () => {
+    const tutorDoc = { name: 'New Tutor', email: 'nt@example.com', status: 'active' };
+    await freshSchool();
+    await assertFails(setDoc(doc(as('newtutor'), 'tutors/newtutor'), tutorDoc));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'system/setup'), { principalUid: 'p', createdAt: new Date() });
+    });
+    await assertSucceeds(setDoc(doc(as('newtutor'), 'tutors/newtutor'), tutorDoc));
   });
 });

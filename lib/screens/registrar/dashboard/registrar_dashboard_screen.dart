@@ -66,6 +66,11 @@ class RegistrarDashboardScreen extends StatelessWidget {
               onTap: () => context.push(AppRoutes.registrarContentTypes),
             ),
             DashboardTile(
+              icon: Icons.calendar_month,
+              label: 'Timetables',
+              onTap: () => context.push(AppRoutes.registrarTimetables),
+            ),
+            DashboardTile(
               icon: Icons.campaign,
               label: 'Public Space',
               onTap: () => context.push(AppRoutes.publicHome),

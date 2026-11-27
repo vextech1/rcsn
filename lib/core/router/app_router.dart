@@ -1,17 +1,24 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'app_routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/setup_provider.dart';
 import '../../providers/student_provider.dart';
 import '../constants/user_role.dart';
 import '../../screens/shared/welcome_screen.dart';
 import '../../screens/shared/role_select_screen.dart';
+import '../../screens/setup/principal_setup_screen.dart';
+import '../../screens/setup/setup_check_screen.dart';
 import '../../data/models/public_post.dart';
 import '../../data/models/staff_position.dart';
 import '../../screens/public/public_home_screen.dart';
 import '../../screens/public/public_post_detail_screen.dart';
 import '../../screens/public/public_compose_screen.dart';
 import '../../screens/public/public_review_screen.dart';
+import '../../screens/registrar/timetables/timetable_editor_screen.dart';
+import '../../screens/registrar/timetables/timetable_list_screen.dart';
+import '../../screens/registrar/timetables/timetable_viewer_screen.dart';
 import '../../screens/staff/auth/staff_login_screen.dart';
 import '../../screens/staff/auth/staff_position_screen.dart';
 import '../../screens/staff/dashboard/staff_member_dashboard_screen.dart';
@@ -93,16 +100,51 @@ import '../../screens/student/account_inactive/student_account_inactive_screen.d
 GoRouter buildAppRouter({
   required AuthProvider authProvider,
   required StudentProvider studentProvider,
+  required SetupProvider setupProvider,
 }) {
   return GoRouter(
     initialLocation: AppRoutes.welcome,
-    refreshListenable: Listenable.merge([authProvider, studentProvider]),
+    refreshListenable:
+        Listenable.merge([authProvider, studentProvider, setupProvider]),
     redirect: (context, state) =>
-        _guard(context, state, authProvider, studentProvider),
+        _guard(context, state, authProvider, studentProvider, setupProvider),
     routes: [
+      // First-run setup (the only routes reachable before the Principal
+      // has registered).
+      GoRoute(path: AppRoutes.setupCheck, builder: (_, __) => const SetupCheckScreen()),
+      GoRoute(path: AppRoutes.setup, builder: (_, __) => const PrincipalSetupScreen()),
+
       // Shared entry routes — wired to their real screens.
       GoRoute(path: AppRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: AppRoutes.roleSelect, builder: (_, __) => const RoleSelectScreen()),
+
+      // Timetables and calendars
+      GoRoute(
+        path: AppRoutes.registrarTimetables,
+        builder: (context, __) => TimetableListScreen(
+          mode: context.read<AuthProvider>().resolvedRole == UserRole.registrar
+              ? TimetableListMode.registrar
+              : TimetableListMode.principal,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.registrarTimetableEditPattern,
+        builder: (_, state) =>
+            TimetableEditorScreen(timetableId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.timetableViewPattern,
+        builder: (_, state) =>
+            TimetableViewerScreen(timetableId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.studentTimetables,
+        builder: (_, __) => const TimetableListScreen(mode: TimetableListMode.student),
+      ),
+      GoRoute(
+        path: AppRoutes.tutorTimetables,
+        builder: (_, __) => const TimetableListScreen(mode: TimetableListMode.staff),
+      ),
 
       // Public space
       GoRoute(path: AppRoutes.publicHome, builder: (_, __) => const PublicHomeScreen()),
@@ -230,8 +272,24 @@ String? _guard(
   GoRouterState state,
   AuthProvider auth,
   StudentProvider student,
+  SetupProvider setup,
 ) {
   final path = state.matchedLocation;
+
+  // First-run gate, before anything else: until the Principal has
+  // registered, the app shows nothing but the setup screens. firestore.rules
+  // enforce the same rule server-side.
+  switch (setup.status) {
+    case SetupStatus.checking:
+    case SetupStatus.error:
+      return path == AppRoutes.setupCheck ? null : AppRoutes.setupCheck;
+    case SetupStatus.needsSetup:
+      return path == AppRoutes.setup ? null : AppRoutes.setup;
+    case SetupStatus.ready:
+      if (path == AppRoutes.setup || path == AppRoutes.setupCheck) {
+        return AppRoutes.welcome;
+      }
+  }
 
   final isEntryRoute = path == AppRoutes.welcome || path == AppRoutes.roleSelect;
   // The position list and the login are both "not signed in yet" screens.
@@ -308,6 +366,12 @@ String? _guard(
     // A signed-in staff member opening another role's section goes
     // home rather than to the login screen.
     if (!allowed) return _staffHome(role);
+
+    // The timetable editor is Registrar-only. The Principal views.
+    final editorPrefix = '${AppRoutes.registrarTimetables}/';
+    if (path.startsWith(editorPrefix) && role != UserRole.registrar) {
+      return AppRoutes.timetableView(path.substring(editorPrefix.length));
+    }
     return null;
   }
 

@@ -100,6 +100,8 @@ class _TutorDashboardScreenState extends State<TutorDashboardScreen> {
               if (value == 'signOut') {
                 await context.read<AuthProvider>().signOut();
                 if (context.mounted) context.go(AppRoutes.roleSelect);
+              } else if (value == 'timetables') {
+                context.push(AppRoutes.tutorTimetables);
               } else if (value == 'public') {
                 context.push(AppRoutes.publicHome);
               } else if (value == 'terminate' && tutorId != null) {
@@ -107,6 +109,7 @@ class _TutorDashboardScreenState extends State<TutorDashboardScreen> {
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'timetables', child: Text('Timetables')),
               PopupMenuItem(value: 'public', child: Text('Public Space')),
               PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
               PopupMenuItem(
