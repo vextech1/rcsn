@@ -66,6 +66,60 @@ void main() {
     }
   });
 
+  test('Diploma Extension Nursing units are as the curriculum lists them', () {
+    const dne = ProgramType.diplomaExtensionNursing;
+    List<String> codes(int year, int semester) =>
+        standardUnits(dne, year, semester).map((u) => u.code).toList();
+    String title(int year, int semester, String code) => standardUnits(
+          dne,
+          year,
+          semester,
+        ).firstWhere((u) => u.code == code).title;
+
+    // Every class of the track is covered, and no other class is invented.
+    final semesters = kTrackDefinitions[dne]!.semestersPerYear;
+    expect(semesters, {1: 2, 2: 1});
+    expect(
+      kCourseCatalogue[dne]!.keys.toSet(),
+      {(1, 1), (1, 2), (2, 1)},
+    );
+
+    expect(codes(1, 1), ['DNE 111', 'DNE 112', 'DNE 113', 'DNE 114', 'DNE 115']);
+    expect(codes(1, 2), ['DNE 121', 'DNE 122', 'DNE 123', 'DNE 124', 'DNE 125']);
+    expect(codes(2, 1), ['DNE 211', 'DNE 212', 'DNE 213', 'DNE 214']);
+
+    expect(title(1, 1, 'DNE 111'), 'Foundations of Nursing III');
+    expect(title(1, 1, 'DNE 112'), 'Medical Nursing III');
+    expect(title(1, 1, 'DNE 113'), 'Surgery III and Paediatric Nursing II');
+    expect(title(1, 1, 'DNE 114'), 'Mental Health II and Pharmacology III');
+    expect(title(1, 2, 'DNE 121'),
+        'Primary Healthcare and Community Based Healthcare');
+    expect(title(1, 2, 'DNE 122'), 'Applied Research and Teaching Methodology');
+    expect(title(1, 2, 'DNE 123'), 'Palliative Care');
+    expect(title(1, 2, 'DNE 124'),
+        'Disaster Management, Occupational Health and Safety');
+    expect(title(2, 1, 'DNE 211'), 'Paediatric Nursing II');
+    expect(title(2, 1, 'DNE 212'), 'Gynaecology II and Reproductive Health');
+    expect(title(2, 1, 'DNE 213'),
+        'Health Service Management and Entrepreneurship');
+
+    // The practicals are 115, 125 and 214, each listed as "Practicals".
+    for (final code in ['DNE 115', 'DNE 125', 'DNE 214']) {
+      final all = [
+        for (final units in kCourseCatalogue[dne]!.values) ...units,
+      ];
+      expect(all.firstWhere((u) => u.code == code).title, 'Practicals');
+    }
+    expect(
+      [
+        for (final units in kCourseCatalogue[dne]!.values)
+          for (final u in units)
+            if (u.title == 'Practicals') u.code,
+      ],
+      ['DNE 115', 'DNE 125', 'DNE 214'],
+    );
+  });
+
   test('Midwifery and Nursing papers never collide', () {
     final nursing = standardUnits(ProgramType.certificateNursing, 1, 1)[0];
     final midwifery = standardUnits(ProgramType.certificateMidwifery, 1, 1)[0];
