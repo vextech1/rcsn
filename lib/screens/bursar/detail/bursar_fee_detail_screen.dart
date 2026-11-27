@@ -5,6 +5,7 @@ import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/utils/money.dart';
+import '../../../core/utils/nsin_validator.dart';
 import '../../../data/models/student_fee.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../widgets/common/app_empty_state.dart';
@@ -74,8 +75,20 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               Text(fee.name, style: Theme.of(context).textTheme.headlineSmall),
-              Text(fee.nsin),
-              Text('Payment number: ${fee.paymentNumber}'),
+              Text(fee.nsin.isEmpty ? 'No NSIN yet' : fee.nsin),
+              Text('Payment code: ${fee.paymentNumber}'),
+              if (fee.nsin.isEmpty)
+                TextButton(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => _NsinDialog(
+                      repository: _repository,
+                      paymentNumber: fee.paymentNumber,
+                    ),
+                  ),
+                  child: const Text('Add NSIN'),
+                ),
               Text(kTrackDefinitions[fee.programType]?.label ??
                   fee.programType.name),
               Text('Year ${fee.year} · Semester ${fee.semester}'),
@@ -102,7 +115,7 @@ class _BursarFeeDetailScreenState extends State<BursarFeeDetailScreen> {
               OutlinedButton(
                 onPressed: () => context.push(
                   AppRoutes.bursarAdd,
-                  extra: fee.nsin,
+                  extra: fee,
                 ),
                 child: const Text('Add another semester'),
               ),
@@ -318,6 +331,76 @@ class _TuitionDialogState extends State<_TuitionDialog> {
               validator: (v) => (parseUgx(v ?? '') ?? 0) > 0
                   ? null
                   : 'Enter the tuition in shillings',
+            ),
+            if (_error != null) AppInlineError(failure: _error!),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _NsinDialog extends StatefulWidget {
+  final FeeRepository repository;
+  final String paymentNumber;
+  const _NsinDialog({required this.repository, required this.paymentNumber});
+
+  @override
+  State<_NsinDialog> createState() => _NsinDialogState();
+}
+
+class _NsinDialogState extends State<_NsinDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nsin = TextEditingController();
+  AppFailure? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _nsin.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await widget.repository.attachNsin(widget.paymentNumber, _nsin.text);
+      if (mounted) Navigator.of(context).pop();
+    } on AppFailure catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add NSIN'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Check it carefully. It cannot be changed afterwards.'),
+            AppTextField(
+              controller: _nsin,
+              label: 'NSIN',
+              validator: (v) => NsinValidator.errorMessage(v ?? ''),
             ),
             if (_error != null) AppInlineError(failure: _error!),
           ],

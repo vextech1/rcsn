@@ -163,6 +163,16 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
               // Back to role selection — for a student who tapped
               // "Student" by mistake and wants to go back.
               //
+              OutlinedButton.icon(
+                onPressed: student.isSearching
+                    ? null
+                    : () => context.push(AppRoutes.feeLookup),
+                icon: const Icon(Icons.payments),
+                label: const Text('No NSIN? Use payment code'),
+              ),
+
+              const SizedBox(height: 12),
+
               // This screen is not always pushed on top of role selection:
               // after Clear Session (or an inactive account) the router
               // redirects here and this is the ONLY page in the stack.

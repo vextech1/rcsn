@@ -18,9 +18,9 @@ import '../../../widgets/forms/app_text_field.dart';
 /// `students`.
 class BursarAddFeeScreen extends StatefulWidget {
   /// Set when adding another semester for a student already listed.
-  final String? initialNsin;
+  final StudentFee? from;
 
-  const BursarAddFeeScreen({super.key, this.initialNsin});
+  const BursarAddFeeScreen({super.key, this.from});
 
   @override
   State<BursarAddFeeScreen> createState() => _BursarAddFeeScreenState();
@@ -28,9 +28,10 @@ class BursarAddFeeScreen extends StatefulWidget {
 
 class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final _nsin = TextEditingController(text: widget.initialNsin);
-  final _name = TextEditingController();
-  final _number = TextEditingController();
+  late final _nsin = TextEditingController(text: widget.from?.nsin);
+  late final _name = TextEditingController(text: widget.from?.name);
+  late final _number =
+      TextEditingController(text: widget.from?.paymentNumber);
   final _tuition = TextEditingController();
 
   ProgramType? _track;
@@ -44,7 +45,8 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialNsin != null) _find();
+    _track = widget.from?.programType;
+    if (widget.from?.nsin.isNotEmpty ?? false) _find();
   }
 
   @override
@@ -136,8 +138,10 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
           children: [
             AppTextField(
               controller: _nsin,
-              label: 'NSIN',
-              validator: (v) => NsinValidator.errorMessage(v ?? ''),
+              label: 'NSIN (leave empty if not yet given)',
+              validator: (v) => (v ?? '').trim().isEmpty
+                  ? null
+                  : NsinValidator.errorMessage(v!),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -172,7 +176,7 @@ class _BursarAddFeeScreenState extends State<BursarAddFeeScreen> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _number,
-              label: 'Payment number',
+              label: 'Payment code',
               validator: (v) => StudentFee.numberError(v ?? ''),
             ),
             const SizedBox(height: 12),

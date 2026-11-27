@@ -20,6 +20,7 @@ enum FeeStatus {
 class StudentFee {
   final String id;
   final String paymentNumber;
+  /// Empty until the student has been given one.
   final String nsin;
   final String name;
   final ProgramType programType;
@@ -53,7 +54,7 @@ class StudentFee {
   static String? numberError(String input) =>
       RegExp(r'^[A-Z0-9]{4,10}$').hasMatch(normalizeNumber(input))
           ? null
-          : 'Enter the payment number (4 to 10 letters or digits)';
+          : 'Enter the payment code (4 to 10 letters or digits)';
 
   /// Negative when the student has paid more than the tuition.
   int get balance => tuition - paid;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/utils/money.dart';
 import '../../../data/models/student_fee.dart';
@@ -9,11 +10,15 @@ import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/forms/app_text_field.dart';
 import '../../bursar/fee_status_label.dart';
 
-/// The student enters the payment number they were given and sees their
-/// tuition for each semester. Read-only. The number is deliberately not saved,
-/// because students share phones.
+/// The student enters the payment code they were given and sees what the
+/// Bursar holds: name, program and tuition for each semester. Read-only. The
+/// code is deliberately not saved, because students share phones.
 class StudentFeesScreen extends StatefulWidget {
-  const StudentFeesScreen({super.key});
+  /// True for a newly admitted student who has no NSIN yet. Only records with
+  /// no NSIN are shown that way; the rest need an NSIN sign-in.
+  final bool withoutNsin;
+
+  const StudentFeesScreen({super.key, this.withoutNsin = false});
 
   @override
   State<StudentFeesScreen> createState() => _StudentFeesScreenState();
@@ -40,7 +45,9 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
       });
       return;
     }
-    final nsin = context.read<StudentProvider>().currentStudent?.nsin;
+    final nsin = widget.withoutNsin
+        ? null
+        : context.read<StudentProvider>().currentStudent?.nsin;
     setState(() {
       _busy = true;
       _fees = null;
@@ -48,13 +55,19 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
     });
     try {
       final found = await FeeRepository().findByNumber(_number.text);
-      // Only the signed-in student's own records are shown.
-      final own = found.where((f) => f.nsin == nsin).toList();
+      // A signed-in student sees their own records, including any not yet
+      // linked to an NSIN.
+      final own = found
+          .where((f) => f.nsin.isEmpty || f.nsin == nsin)
+          .toList();
       if (!mounted) return;
       setState(() {
         if (own.isEmpty) {
-          _error = const FeeFailure(
-            'No fees found for that payment number. Check it or ask the Bursar.',
+          _error = FeeFailure(
+            widget.withoutNsin && found.isNotEmpty
+                ? 'You already have an NSIN. Go back and sign in with it.'
+                : 'Nothing found for that payment code. Check it or ask the '
+                    'Bursar.',
           );
         } else {
           _fees = own;
@@ -70,11 +83,13 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My fees')),
+      appBar: AppBar(
+        title: Text(widget.withoutNsin ? 'Payment code' : 'My fees'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          AppTextField(controller: _number, label: 'Payment number'),
+          AppTextField(controller: _number, label: 'Payment code'),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _busy ? null : _show,
@@ -94,6 +109,8 @@ class _StudentFeesScreenState extends State<StudentFeesScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(fee.name),
+                    Text(kTrackDefinitions[fee.programType]?.label ??
+                        fee.programType.name),
                     const SizedBox(height: 8),
                     Text('Tuition: ${formatUgx(fee.tuition)}'),
                     Text('Paid: ${formatUgx(fee.paid)}'),

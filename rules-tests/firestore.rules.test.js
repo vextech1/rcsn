@@ -685,6 +685,20 @@ describe('student fees', () => {
     await assertFails(pay(400, 800)); // same payment id again
     await assertFails(pay(-100, 300, { pid: 'p2' })); // negative, not a correction
   });
+  it('adds a missing NSIN once, on the number and its records together', async () => {
+    await assertSucceeds(open({ nsin: '' }, ''));
+    const attach = (nsin, recordNsin = nsin) => {
+      const db = as('bursar1');
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'fee_numbers/PN12345'), { nsin, ...stamp('bursar1') });
+      batch.update(doc(db, feePath), { nsin: recordNsin, ...stamp('bursar1') });
+      return batch.commit();
+    };
+    await assertFails(attach('JAN26/U028/MCK/001', 'JAN26/U028/MCK/002'));
+    await assertFails(attach('nonsense'));
+    await assertSucceeds(attach('JAN26/U028/MCK/001'));
+    await assertFails(attach('JAN26/U028/MCK/002'));
+  });
   it('never deletes', async () => {
     await assertSucceeds(open());
     await assertSucceeds(pay(400, 400));

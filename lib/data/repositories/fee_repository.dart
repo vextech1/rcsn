@@ -44,6 +44,7 @@ class FeeRepository {
 
   /// The payment number already attached to this student, if any.
   Future<String?> numberFor(String nsin) async {
+    if (nsin.trim().isEmpty) return null;
     final found = await _fees
         .where('nsin', isEqualTo: NsinValidator.normalize(nsin))
         .limit(1)
@@ -99,8 +100,22 @@ class FeeRepository {
           final owner = await tx.get(numberRef);
           if (owner.exists && owner.data()!['nsin'] != normalized) {
             throw const FeeFailure(
-              'That payment number belongs to another student.',
+              'That payment code belongs to another student.',
             );
+          }
+          // With no NSIN to compare, the name is what tells students apart.
+          if (owner.exists && normalized.isEmpty) {
+            final others = await _fees
+                .where('paymentNumber', isEqualTo: number)
+                .limit(1)
+                .get();
+            if (others.docs.isNotEmpty &&
+                (others.docs.first.data()['name'] as String).toLowerCase() !=
+                    name.trim().toLowerCase()) {
+              throw const FeeFailure(
+                'That payment code belongs to another student.',
+              );
+            }
           }
           if ((await tx.get(ref)).exists) {
             throw const FeeFailure(
@@ -123,6 +138,30 @@ class FeeRepository {
           });
         }));
     return ref.id;
+  }
+
+  /// Attaches the NSIN a new student has now been given to every record under
+  /// their payment number. Possible once only.
+  Future<void> attachNsin(String paymentNumber, String nsin) async {
+    final normalized = NsinValidator.normalize(nsin);
+    final existing = await numberFor(normalized);
+    if (existing != null) {
+      throw FeeFailure('That NSIN already has payment number $existing.');
+    }
+    await _run(() async {
+      final records = await _fees
+          .where('paymentNumber', isEqualTo: paymentNumber)
+          .get(const GetOptions(source: Source.server));
+      final batch = _firestore.batch()
+        ..update(_numbers.doc(paymentNumber), {
+          'nsin': normalized,
+          ..._stamp(),
+        });
+      for (final doc in records.docs) {
+        batch.update(doc.reference, {'nsin': normalized, ..._stamp()});
+      }
+      await batch.commit();
+    });
   }
 
   Future<void> setTuition(String feeId, int tuition) => _run(
