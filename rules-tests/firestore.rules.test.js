@@ -337,59 +337,6 @@ describe('staff_positions (the list on the Staff screen)', () => {
   });
 });
 
-describe('staff_slots (is the Principal / Deputy option taken?)', () => {
-  const slot = (claimed) => ({ claimed, updatedAt: serverTimestamp() });
-
-  beforeEach(async () => {
-    await env.withSecurityRulesDisabled(async (ctx) => {
-      const db = ctx.firestore();
-      await setDoc(doc(db, 'staff_slots/principal'), { claimed: true, updatedAt: new Date() });
-      await setDoc(doc(db, 'staff_slots/deputyPrincipal'), { claimed: true, updatedAt: new Date() });
-    });
-  });
-
-  it('anyone can read a slot, but nobody can list them', async () => {
-    await assertSucceeds(getDoc(doc(anon(), 'staff_slots/principal')));
-    await assertSucceeds(getDoc(doc(anon(), 'staff_slots/deputyPrincipal')));
-    await assertFails(getDocs(collection(anon(), 'staff_slots')));
-  });
-
-  it('the principal marks their own slot taken, and nobody else can', async () => {
-    await assertSucceeds(setDoc(doc(as('principal1'), 'staff_slots/principal'), slot(true)));
-    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/principal'), slot(true)));
-    await assertFails(setDoc(doc(as('registrar1'), 'staff_slots/principal'), slot(true)));
-    await assertFails(setDoc(doc(anon(), 'staff_slots/principal'), slot(true)));
-  });
-
-  it('the deputy marks their own slot taken; the principal cannot do it for them', async () => {
-    await assertSucceeds(setDoc(doc(as('deputy1'), 'staff_slots/deputyPrincipal'), slot(true)));
-    await assertFails(setDoc(doc(as('principal1'), 'staff_slots/deputyPrincipal'), slot(true)));
-    await assertFails(setDoc(doc(as('askari1'), 'staff_slots/deputyPrincipal'), slot(true)));
-  });
-
-  it('a terminated deputy cannot mark the slot taken again', async () => {
-    await assertFails(setDoc(doc(as('deputy2'), 'staff_slots/deputyPrincipal'), slot(true)));
-  });
-
-  it('only the principal can reopen the deputy slot, and the principal slot never reopens', async () => {
-    await assertSucceeds(setDoc(doc(as('principal1'), 'staff_slots/deputyPrincipal'), slot(false)));
-    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/deputyPrincipal'), slot(false)));
-    await assertFails(setDoc(doc(as('registrar1'), 'staff_slots/deputyPrincipal'), slot(false)));
-    await assertFails(setDoc(doc(as('principal1'), 'staff_slots/principal'), slot(false)));
-    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/principal'), slot(false)));
-  });
-
-  it('a slot write must be well-formed, only for the two slots, and never deleted', async () => {
-    const db = as('principal1');
-    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: 'yes', updatedAt: serverTimestamp() }));
-    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { ...slot(true), extra: 1 }));
-    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: true, updatedAt: new Date(0) }));
-    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: true }));
-    await assertFails(setDoc(doc(db, 'staff_slots/registrar'), slot(true)));
-    await assertFails(deleteDoc(doc(db, 'staff_slots/principal')));
-  });
-});
-
 describe('deputy principal in the rest of the app', () => {
   it('the deputy can create and edit academic structure like the principal', async () => {
     await assertSucceeds(setDoc(doc(as('deputy1'), 'subjects/ds1'), subject));

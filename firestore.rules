@@ -201,36 +201,6 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
-    // staff_slots — has the Principal / Deputy Principal option been taken?
-    // -------------------------------------------------------------------
-    //
-    // Doc IDs: 'principal' and 'deputyPrincipal'. Readable by anyone so the
-    // Staff screen can hide an option once its holder has signed in. Only
-    // that holder can mark their own slot taken, and only the Principal can
-    // reopen the Deputy slot (done in the same batch that terminates the
-    // Deputy). The Principal slot never reopens.
-
-    match /staff_slots/{slot} {
-      allow get: if true;
-      allow list: if false;
-
-      allow create, update: if request.resource.data.keys().hasAll(['claimed', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['claimed', 'updatedAt'])
-        && request.resource.data.claimed is bool
-        && request.resource.data.updatedAt == request.time
-        && (
-          (request.resource.data.claimed == true
-            && ((slot == 'principal' && isPrincipal())
-                || (slot == 'deputyPrincipal' && isDeputy())))
-          || (request.resource.data.claimed == false
-              && slot == 'deputyPrincipal'
-              && isPrincipal())
-        );
-
-      allow delete: if false;
-    }
-
-    // -------------------------------------------------------------------
     // public_posts — the Public Space (announcements, calendar, sports,
     // graduations, performances, gallery, general info)
     // -------------------------------------------------------------------
