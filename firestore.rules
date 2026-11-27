@@ -658,18 +658,23 @@ service cloud.firestore {
       // runtime). ContentRepository.seedDefaultContentTypesIfNeeded()
       // runs during first-run setup (as admin).
       allow create: if isAdmin()
-        && request.resource.data.name is string;
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 60;
 
-      // Update: admin only. Renaming a category is a deliberate
-      // exclusion for now (see AdminContentTypesScreen's doc comment),
-      // but the rule allows it for admin so it's not permanently locked.
-      allow update: if isAdmin();
+      // Update (rename): admin only, and only the name may change.
+      // Existing uploads reference a category by id, so a rename is safe.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 60;
 
-      // Delete: admin only. Same caveat as AdminContentTypesScreen —
-      // deleting a type that's referenced by existing ContentItems would
-      // orphan those items' contentTypeId. The UI doesn't expose delete
-      // yet; this rule allows it so the capability exists when the
-      // UI catches up, but Admin should be careful.
+      // Delete: admin only. Deleting a category that uploads still point
+      // at would orphan them; the rules cannot count documents, so the
+      // app refuses to delete a category that is in use (see
+      // ContentRepository.deleteContentType).
       allow delete: if isAdmin();
     }
 

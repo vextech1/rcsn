@@ -913,3 +913,38 @@ describe('staff details edit', () => {
     await assertFails(updateDoc(doc(anon(), 'staff/registrar1'), { name: 'Nope' }));
   });
 });
+
+describe('content type rename and delete', () => {
+  it('the principal and the registrar can rename a category', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'content_types/ct1'), { name: 'Study Notes' }));
+    await assertSucceeds(updateDoc(doc(as('registrar1'), 'content_types/ct1'), { name: 'Handouts' }));
+  });
+
+  it('only the name can change in a rename', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'content_types/ct1'), { name: 'Notes', createdAt: new Date() }));
+    await assertFails(updateDoc(doc(as('principal1'), 'content_types/ct1'), { extra: true }));
+  });
+
+  it('the name must be 2 to 60 characters', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'content_types/ct1'), { name: 'A' }));
+    await assertFails(updateDoc(doc(as('principal1'), 'content_types/ct1'), { name: 'x'.repeat(61) }));
+    await assertFails(setDoc(doc(as('principal1'), 'content_types/new1'), { name: 'A' }));
+  });
+
+  it('tutors, bursars and strangers cannot rename or delete a category', async () => {
+    await assertFails(updateDoc(doc(as('tutor1'), 'content_types/ct1'), { name: 'Nope' }));
+    await assertFails(updateDoc(doc(as('bursar1'), 'content_types/ct1'), { name: 'Nope' }));
+    await assertFails(updateDoc(doc(anon(), 'content_types/ct1'), { name: 'Nope' }));
+    await assertFails(deleteDoc(doc(as('tutor1'), 'content_types/ct1')));
+    await assertFails(deleteDoc(doc(as('bursar1'), 'content_types/ct1')));
+    await assertFails(deleteDoc(doc(anon(), 'content_types/ct1')));
+  });
+
+  it('the principal and the registrar can delete a category', async () => {
+    await assertSucceeds(deleteDoc(doc(as('principal1'), 'content_types/ct1')));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'content_types/ct2'), { name: 'Other' });
+    });
+    await assertSucceeds(deleteDoc(doc(as('registrar1'), 'content_types/ct2')));
+  });
+});

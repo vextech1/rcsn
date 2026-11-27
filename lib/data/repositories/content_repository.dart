@@ -199,12 +199,65 @@ class ContentRepository {
   /// runtime, per Section 4.3's explicit requirement that this list not
   /// be a fixed, code-baked enum.
   Future<ContentTypeCategory> addContentType(String name) async {
+    final cleanName = await _validatedTypeName(name);
     final docRef = await _contentTypes.add({
-      'name': name,
+      'name': cleanName,
       'createdAt': Timestamp.now(),
     });
     final snapshot = await docRef.get();
     return ContentTypeCategory.fromFirestore(snapshot);
+  }
+
+  /// Renames a category. Safe for existing uploads: a ContentItem points at
+  /// its category by id, never by name, so every item picks up the new name
+  /// straight away.
+  Future<void> renameContentType({
+    required String id,
+    required String name,
+  }) async {
+    final cleanName = await _validatedTypeName(name, exceptId: id);
+    await _contentTypes.doc(id).update({'name': cleanName});
+  }
+
+  /// Deletes a category, but only if nothing is filed under it. Deleting a
+  /// category that uploads still point at would orphan them, and the
+  /// security rules cannot count documents, so the check lives here.
+  /// Archived uploads count too.
+  Future<void> deleteContentType(String id) async {
+    final inUse = await _firestore
+        .collection('content_items')
+        .where('contentTypeId', isEqualTo: id)
+        .limit(1)
+        .get();
+    if (inUse.docs.isNotEmpty) {
+      throw const UnknownFailure(
+        'Some uploads are filed under this category, so it cannot be '
+        'deleted. Rename it instead, or remove those uploads first.',
+      );
+    }
+    await _contentTypes.doc(id).delete();
+  }
+
+  /// Trims [name], checks its length and that no OTHER category already has
+  /// it (ignoring case).
+  Future<String> _validatedTypeName(String name, {String? exceptId}) async {
+    final cleanName = name.trim();
+    if (cleanName.length < 2 || cleanName.length > 60) {
+      throw const UnknownFailure(
+        'The category name must be 2 to 60 characters.',
+      );
+    }
+    final all = await _contentTypes.get();
+    final taken = all.docs.any(
+      (d) =>
+          d.id != exceptId &&
+          (d.data()['name'] as String?)?.trim().toLowerCase() ==
+              cleanName.toLowerCase(),
+    );
+    if (taken) {
+      throw const UnknownFailure('A category with that name already exists.');
+    }
+    return cleanName;
   }
 
   Stream<List<ContentTypeCategory>> watchContentTypes() {

@@ -120,4 +120,15 @@ class ContentProvider extends ChangeNotifier {
   Future<void> addContentType(String name) {
     return _repository.addContentType(name);
   }
+
+  /// Admin-only. Renames a category; existing uploads follow automatically.
+  Future<void> renameContentType({required String id, required String name}) {
+    return _repository.renameContentType(id: id, name: name);
+  }
+
+  /// Admin-only. Deletes a category that nothing is filed under; throws a
+  /// readable failure if uploads still use it.
+  Future<void> deleteContentType(String id) {
+    return _repository.deleteContentType(id);
+  }
 }
