@@ -7,11 +7,14 @@ import '../constants/user_role.dart';
 import '../../screens/shared/welcome_screen.dart';
 import '../../screens/shared/role_select_screen.dart';
 import '../../data/models/public_post.dart';
+import '../../data/models/staff_position.dart';
 import '../../screens/public/public_home_screen.dart';
 import '../../screens/public/public_post_detail_screen.dart';
 import '../../screens/public/public_compose_screen.dart';
 import '../../screens/public/public_review_screen.dart';
 import '../../screens/staff/auth/staff_login_screen.dart';
+import '../../screens/staff/auth/staff_position_screen.dart';
+import '../../screens/staff/dashboard/staff_member_dashboard_screen.dart';
 import '../../screens/principal/dashboard/principal_dashboard_screen.dart';
 import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
@@ -113,7 +116,20 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.publicReview, builder: (_, __) => const PublicReviewScreen()),
 
       // Staff
-      GoRoute(path: AppRoutes.staffLogin, builder: (_, __) => const StaffLoginScreen()),
+      GoRoute(path: AppRoutes.staffPositions, builder: (_, __) => const StaffPositionScreen()),
+      GoRoute(
+        path: AppRoutes.staffLogin,
+        // The picked position travels as `extra`. It is null when the
+        // router sent the user here (a signed-out visit to a staff-only
+        // screen); sign-in then works without a position check.
+        builder: (_, state) {
+          final extra = state.extra;
+          return StaffLoginScreen(
+            position: extra is StaffPosition ? extra : null,
+          );
+        },
+      ),
+      GoRoute(path: AppRoutes.staffHome, builder: (_, __) => const StaffMemberDashboardScreen()),
 
       // Principal
       GoRoute(path: AppRoutes.principalDashboard, builder: (_, __) => const PrincipalDashboardScreen()),
@@ -157,11 +173,14 @@ GoRouter buildAppRouter({
 String _staffHome(UserRole role) {
   switch (role) {
     case UserRole.principal:
+    case UserRole.deputyPrincipal:
       return AppRoutes.principalDashboard;
     case UserRole.registrar:
       return AppRoutes.registrarDashboard;
     case UserRole.bursar:
       return AppRoutes.bursarDashboard;
+    case UserRole.staffMember:
+      return AppRoutes.staffHome;
     case UserRole.tutor:
     case UserRole.student:
       return AppRoutes.staffLogin;
@@ -177,7 +196,10 @@ String? _guard(
   final path = state.matchedLocation;
 
   final isEntryRoute = path == AppRoutes.welcome || path == AppRoutes.roleSelect;
-  final isStaffLogin = path == AppRoutes.staffLogin;
+  // The position list and the login are both "not signed in yet" screens.
+  final isStaffLogin =
+      path == AppRoutes.staffLogin || path == AppRoutes.staffPositions;
+  final isStaffHomeRoute = path == AppRoutes.staffHome;
   final isPrincipalRoute = path.startsWith('/principal');
   final isRegistrarRoute = path.startsWith('/registrar');
   final isBursarRoute = path.startsWith('/bursar');
@@ -235,18 +257,30 @@ String? _guard(
     if (!auth.isUsableStaffSession) return AppRoutes.staffLogin;
 
     final role = auth.resolvedRole!;
+    // The Deputy Principal has the Principal's screens and access.
     final allowed = isPrincipalRoute
-        ? role == UserRole.principal
+        ? role.isPrincipalLevel
         : isBursarRoute
             ? role == UserRole.bursar
-            // Registrar section: the Registrar, plus the Principal while
-            // the academic screens have no separate Principal view yet
-            // (Phase 2).
-            : role == UserRole.registrar || role == UserRole.principal;
+            // Registrar section: the Registrar, plus the Principal and
+            // Deputy Principal while the academic screens have no separate
+            // Principal view yet (Phase 2).
+            : role == UserRole.registrar || role.isPrincipalLevel;
 
     // A signed-in staff member opening another role's section goes
     // home rather than to the login screen.
     if (!allowed) return _staffHome(role);
+    return null;
+  }
+
+  // ---------------------------------------------------------------
+  // Custom-position staff home (Askari, Accountant, ...)
+  // ---------------------------------------------------------------
+  if (isStaffHomeRoute) {
+    if (auth.isResolving) return null;
+    if (!auth.isUsableStaffSession) return AppRoutes.staffLogin;
+    final role = auth.resolvedRole!;
+    if (role != UserRole.staffMember) return _staffHome(role);
     return null;
   }
 
@@ -328,7 +362,10 @@ String? _guard(
   if (path.startsWith('/public')) {
     if (path == AppRoutes.publicNew) {
       if (auth.isResolving) return null;
-      if (!auth.isUsableStaffSession && !auth.isUsableTutorSession) {
+      // Staff in a custom position can read the Public Space but not post.
+      final staffCanPost =
+          auth.isUsableStaffSession && auth.resolvedRole!.canPublishPublicly;
+      if (!staffCanPost && !auth.isUsableTutorSession) {
         return AppRoutes.publicHome;
       }
       return null;
@@ -336,8 +373,8 @@ String? _guard(
     if (path == AppRoutes.publicReview) {
       if (auth.isResolving) return null;
       final role = auth.resolvedRole;
-      final canReview = auth.isUsableStaffSession &&
-          (role == UserRole.principal || role == UserRole.registrar);
+      final canReview =
+          auth.isUsableStaffSession && role != null && role.canModeratePublic;
       if (!canReview) return AppRoutes.publicHome;
       return null;
     }

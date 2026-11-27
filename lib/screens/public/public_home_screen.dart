@@ -55,10 +55,11 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final canPost = auth.isUsableStaffSession || auth.isUsableTutorSession;
-    final canReview = auth.isUsableStaffSession &&
-        (auth.resolvedRole == UserRole.principal ||
-            auth.resolvedRole == UserRole.registrar);
+    final canPost = (auth.isUsableStaffSession &&
+            auth.resolvedRole!.canPublishPublicly) ||
+        auth.isUsableTutorSession;
+    final canReview =
+        auth.isUsableStaffSession && auth.resolvedRole!.canModeratePublic;
 
     return DefaultTabController(
       length: _tabs.length,

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/services/auth_service.dart';
 import '../data/repositories/staff_repository.dart';
+import '../data/repositories/staff_position_repository.dart';
 import '../data/repositories/tutor_repository.dart';
 import '../data/models/staff_account.dart';
+import '../data/models/staff_position.dart';
 import '../data/models/tutor_account.dart';
 import '../core/constants/user_role.dart';
 import '../core/errors/app_failure.dart';
@@ -16,20 +19,24 @@ import '../core/errors/app_failure.dart';
 /// provider is built on Firebase Auth's authStateChanges.
 ///
 /// Firebase Auth itself has no concept of "role", so this provider
-/// resolves it from Firestore: a `staff` record (Principal, Registrar or
-/// Bursar) wins, otherwise a `tutors` record makes the user a Tutor.
+/// resolves it from Firestore: a `staff` record (Principal, Deputy
+/// Principal, Registrar, Bursar or another staff position) wins, otherwise
+/// a `tutors` record makes the user a Tutor.
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final StaffRepository _staffRepository;
   final TutorRepository _tutorRepository;
+  final StaffPositionRepository _positionRepository;
 
   AuthProvider({
     AuthService? authService,
     StaffRepository? staffRepository,
     TutorRepository? tutorRepository,
+    StaffPositionRepository? positionRepository,
   })  : _authService = authService ?? AuthService(),
         _staffRepository = staffRepository ?? StaffRepository(),
-        _tutorRepository = tutorRepository ?? TutorRepository() {
+        _tutorRepository = tutorRepository ?? TutorRepository(),
+        _positionRepository = positionRepository ?? StaffPositionRepository() {
     _authService.authStateChanges.listen(_onAuthStateChanged);
   }
 
@@ -45,6 +52,11 @@ class AuthProvider extends ChangeNotifier {
   // auth-state listener again with a null user; without this the listener
   // would wipe the very message explaining why.
   AppFailure? _errorAfterSignOut;
+
+  // The position the person picked on the Staff screen for the sign-in in
+  // progress. Consumed (and cleared) when the account resolves, so a wrong
+  // pick is rejected instead of silently landing on another dashboard.
+  StaffPosition? _selectedPosition;
 
   User? get firebaseUser => _firebaseUser;
   UserRole? get resolvedRole => _resolvedRole;
@@ -91,9 +103,27 @@ class AuthProvider extends ChangeNotifier {
     try {
       final staff = await _staffRepository.getStaffById(user.uid);
       if (staff != null) {
-        if (staff.isActive) {
+        final selected = _selectedPosition;
+        _selectedPosition = null;
+        if (staff.isActive &&
+            selected != null &&
+            !selected.matches(staff)) {
+          await _rejectSession(UnknownFailure(
+            'This account is ${staff.positionLabel}, not ${selected.title}. '
+            'Go back and choose ${staff.positionLabel}.',
+          ));
+        } else if (staff.isActive) {
           _staffAccount = staff;
           _resolvedRole = staff.role;
+          // The Principal and Deputy Principal options leave the Staff
+          // screen once their holder has signed in. Best effort: failing to
+          // record it must never block sign-in.
+          if (staff.role == UserRole.principal ||
+              staff.role == UserRole.deputyPrincipal) {
+            unawaited(
+              _positionRepository.markSlotClaimed(staff.role).catchError((_) {}),
+            );
+          }
         } else {
           await _rejectSession(const AccountSuspendedFailure());
         }
@@ -157,12 +187,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// [position] is what the person picked on the Staff screen; null for
+  /// Tutor sign-in, which has no position list.
   Future<void> signIn({
     required String email,
     required String password,
+    StaffPosition? position,
   }) async {
     _lastError = null;
     _errorAfterSignOut = null;
+    _selectedPosition = position;
     try {
       await _authService.signInWithEmail(email: email, password: password);
     } on AppFailure catch (e) {

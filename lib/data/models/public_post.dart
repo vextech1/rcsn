@@ -95,6 +95,8 @@ class PublicPost {
     switch (authorRole) {
       case 'principal':
         return 'Principal';
+      case 'deputyPrincipal':
+        return 'Deputy Principal';
       case 'registrar':
         return 'Registrar';
       case 'bursar':

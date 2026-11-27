@@ -54,15 +54,11 @@ class RoleSelectScreen extends StatelessWidget {
               _RoleButton(
                 label: 'Staff',
                 icon: Icons.admin_panel_settings,
-                // Clear any error left over from a previous, abandoned
-                // login attempt before this fresh navigation. See
-                // AuthProvider.clearError for why this happens HERE and
-                // not inside the login screen. push, not go: this is a
-                // forward drill-down, so back returns to this screen.
-                onTap: () {
-                  context.read<AuthProvider>().clearError();
-                  context.push(AppRoutes.staffLogin);
-                },
+                // Staff pick their position first (the list is on the next
+                // screen), then sign in. That screen clears any stale login
+                // error. push, not go: this is a forward drill-down, so back
+                // returns to this screen.
+                onTap: () => context.push(AppRoutes.staffPositions),
               ),
               const SizedBox(height: 16),
               _RoleButton(

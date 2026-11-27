@@ -19,23 +19,37 @@ service cloud.firestore {
     }
 
     /// True if the caller is an active staff member with the given role
-    /// ('principal' | 'registrar' | 'bursar').
+    /// ('principal' | 'deputyPrincipal' | 'registrar' | 'bursar' |
+    /// 'staffMember').
     function isStaffRole(role) {
       return isStaff()
         && get(/databases/$(database)/documents/staff/$(request.auth.uid))
              .data.role == role;
     }
 
-    function isPrincipal() { return isStaffRole('principal'); }
-    function isRegistrar() { return isStaffRole('registrar'); }
-    function isBursar()    { return isStaffRole('bursar'); }
+    function isPrincipal()      { return isStaffRole('principal'); }
+    function isDeputy()         { return isStaffRole('deputyPrincipal'); }
+    /// The Deputy Principal has the Principal's day-to-day powers; the places
+    /// that must stay Principal-only (creating or terminating the Deputy,
+    /// touching the Principal record) use isPrincipal() instead.
+    function isPrincipalLevel() { return isPrincipal() || isDeputy(); }
+    function isRegistrar()      { return isStaffRole('registrar'); }
+    function isBursar()         { return isStaffRole('bursar'); }
+
+    /// Staff who may publish to the Public Space directly. Custom positions
+    /// ('staffMember': Askari, Accountant, ...) can read it but not post.
+    function isPostingStaff() {
+      return isStaff()
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid))
+             .data.role in ['principal', 'deputyPrincipal', 'registrar', 'bursar'];
+    }
 
     /// TRANSITIONAL (Phase 1). Stands in for the retired single Admin on
     /// every academic collection below, so the existing management screens
     /// keep working. Phase 2 narrows writes to isRegistrar() and leaves the
     /// Principal with view plus status override.
     function isAdmin() {
-      return isPrincipal() || isRegistrar();
+      return isPrincipalLevel() || isRegistrar();
     }
 
     /// True if the requesting user has an active Tutor account.
@@ -61,16 +75,23 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
-    // staff — Principal, Registrar, Bursar (replaces the single Admin)
+    // staff — Principal, Deputy Principal, Registrar, Bursar and other staff
     // -------------------------------------------------------------------
     //
     // Doc ID = Firebase Auth uid. Runs on the free Spark plan, so there are
-    // no Cloud Functions: the Principal's app writes these documents and
-    // these rules are the whole security boundary. The Principal can only
-    // ever create a registrar or bursar (never another principal), can only
-    // flip status on someone else, and nobody can delete staff. The first
-    // Principal is created out-of-band (tools/bootstrap-principal.js or by
-    // hand in the console), never from the app.
+    // no Cloud Functions: the app writes these documents and these rules are
+    // the whole security boundary.
+    //
+    //   - The Principal and the Deputy Principal can list staff and create
+    //     registrar, bursar and staffMember accounts. A staffMember is a
+    //     custom position (Askari, Accountant, ...) named in `position`.
+    //   - Only the Principal can create the Deputy Principal, and only the
+    //     Principal can terminate (suspend) them. Termination is one-way:
+    //     a Deputy record is never reactivated, a new one is appointed.
+    //   - Nobody can create another principal, change the Principal record,
+    //     change their own status, or delete staff.
+    //   - The first Principal is created out-of-band
+    //     (tools/bootstrap-principal.js or by hand in the console).
     //
     // Suspension is enforced here, live on every request (isStaff() reads
     // status), and by the app signing a suspended user out.
@@ -78,31 +99,52 @@ service cloud.firestore {
     match /staff/{staffId} {
       // A staff member reads their own record (role resolution at login,
       // including when suspended, so the app can explain why). The
-      // Principal reads any record and lists all staff.
+      // Principal and Deputy Principal read any record and list all staff.
       allow get: if request.auth != null
-        && (request.auth.uid == staffId || isPrincipal());
-      allow list: if isPrincipal();
+        && (request.auth.uid == staffId || isPrincipalLevel());
+      allow list: if isPrincipalLevel();
 
-      allow create: if isPrincipal()
-        && request.resource.data.keys().hasOnly(
-             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+      allow create: if isPrincipalLevel()
         && request.resource.data.keys().hasAll(
              ['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(
+             ['name', 'email', 'role', 'status', 'createdAt', 'createdBy',
+              'position'])
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 100
         && request.resource.data.email is string
         && request.resource.data.email.matches('.+@.+[.].+')
-        && request.resource.data.role in ['registrar', 'bursar']
+        && (
+          request.resource.data.role in ['registrar', 'bursar', 'staffMember']
+          || (request.resource.data.role == 'deputyPrincipal' && isPrincipal())
+        )
+        && (
+          (request.resource.data.role == 'staffMember'
+            && 'position' in request.resource.data
+            && request.resource.data.position is string
+            && request.resource.data.position.size() >= 2
+            && request.resource.data.position.size() <= 60)
+          || (request.resource.data.role != 'staffMember'
+            && !('position' in request.resource.data))
+        )
         && request.resource.data.status == 'active'
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;
 
-      // Suspend / reactivate: Principal only, never themselves, never the
-      // Principal record, and only the status stamp fields may change.
-      allow update: if isPrincipal()
+      // Suspend / reactivate: Principal or Deputy Principal, never
+      // themselves, never the Principal record, and only the status stamp
+      // fields may change. The Deputy's record is the exception: only the
+      // Principal can touch it, and only to terminate (active -> suspended).
+      allow update: if isPrincipalLevel()
         && staffId != request.auth.uid
         && resource.data.role != 'principal'
+        && (
+          resource.data.role != 'deputyPrincipal'
+          || (isPrincipal()
+              && resource.data.status == 'active'
+              && request.resource.data.status == 'suspended')
+        )
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'updatedAt', 'updatedBy'])
         && request.resource.data.status in ['active', 'suspended']
@@ -113,12 +155,69 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------
+    // staff_positions — the list on the Staff screen (custom positions)
+    // -------------------------------------------------------------------
+    //
+    // Principal, Deputy Principal, Registrar and Bursar are built into the
+    // app. Everything else (Askari, Accountant, Clinical Instructor, ...) is
+    // a document here, added by the Principal or Deputy Principal. Readable
+    // by anyone because the list is shown before sign-in; it holds nothing
+    // but job titles. Picking a position grants nothing: accounts are still
+    // created under `staff` above.
+
+    match /staff_positions/{positionId} {
+      allow read: if true;
+
+      allow create: if isPrincipalLevel()
+        && request.resource.data.keys().hasAll(['title', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['title', 'createdAt', 'createdBy'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 2
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isPrincipalLevel();
+    }
+
+    // -------------------------------------------------------------------
+    // staff_slots — has the Principal / Deputy Principal option been taken?
+    // -------------------------------------------------------------------
+    //
+    // Doc IDs: 'principal' and 'deputyPrincipal'. Readable by anyone so the
+    // Staff screen can hide an option once its holder has signed in. Only
+    // that holder can mark their own slot taken, and only the Principal can
+    // reopen the Deputy slot (done in the same batch that terminates the
+    // Deputy). The Principal slot never reopens.
+
+    match /staff_slots/{slot} {
+      allow get: if true;
+      allow list: if false;
+
+      allow create, update: if request.resource.data.keys().hasAll(['claimed', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['claimed', 'updatedAt'])
+        && request.resource.data.claimed is bool
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.claimed == true
+            && ((slot == 'principal' && isPrincipal())
+                || (slot == 'deputyPrincipal' && isDeputy())))
+          || (request.resource.data.claimed == false
+              && slot == 'deputyPrincipal'
+              && isPrincipal())
+        );
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------
     // public_posts — the Public Space (announcements, calendar, sports,
     // graduations, performances, gallery, general info)
     // -------------------------------------------------------------------
     //
     // Readable by ANYONE who has the app, no sign-in, but only once
-    // published. Principal, Registrar and Bursar publish directly; a
+    // published. Principal, Deputy Principal, Registrar and Bursar publish directly; a
     // tutor's post is created 'pending' and goes live only when the
     // Principal or Registrar approves it (tutors self-register, so they
     // must not be able to broadcast to the whole public unreviewed).
@@ -129,8 +228,7 @@ service cloud.firestore {
       // archived ones; authors see their own. A query must filter on
       // status == 'published' to be allowed for the public.
       allow read: if resource.data.status == 'published'
-        || isPrincipal()
-        || isRegistrar()
+        || isAdmin()
         || (request.auth != null && resource.data.authorId == request.auth.uid);
 
       allow create: if request.auth != null
@@ -162,8 +260,9 @@ service cloud.firestore {
         && (request.resource.data.category != 'gallery'
             || 'imageUrl' in request.resource.data)
         && (
-          // Staff publish directly, under their real role and name.
-          (isStaff()
+          // Principal, Deputy Principal, Registrar and Bursar publish
+          // directly, under their real role and name.
+          (isPostingStaff()
             && request.resource.data.status == 'published'
             && request.resource.data.authorRole ==
                  get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role
@@ -178,13 +277,13 @@ service cloud.firestore {
                  get(/databases/$(database)/documents/tutors/$(request.auth.uid)).data.name)
         );
 
-      // Only the status stamp ever changes. Principal / Registrar publish
+      // Only the status stamp ever changes. Principal / Deputy / Registrar publish
       // or archive; an author can only withdraw (archive) their own post.
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'reviewedBy', 'reviewedAt'])
         && (
-          ((isPrincipal() || isRegistrar())
+          (isAdmin()
             && request.resource.data.status in ['published', 'archived']
             && request.resource.data.reviewedBy == request.auth.uid
             && request.resource.data.reviewedAt == request.time)
@@ -195,7 +294,7 @@ service cloud.firestore {
                  .hasOnly(['status']))
         );
 
-      allow delete: if isPrincipal() || isRegistrar();
+      allow delete: if isAdmin();
     }
 
     // -------------------------------------------------------------------

@@ -68,9 +68,8 @@ class _PublicPostDetailScreenState extends State<PublicPostDetailScreen> {
     final post = widget.post;
     final auth = context.watch<AuthProvider>();
 
-    final isModerator = auth.isUsableStaffSession &&
-        (auth.resolvedRole == UserRole.principal ||
-            auth.resolvedRole == UserRole.registrar);
+    final isModerator =
+        auth.isUsableStaffSession && auth.resolvedRole!.canModeratePublic;
     final isAuthor = auth.firebaseUser != null &&
         auth.firebaseUser!.uid == post.authorId;
     final canRemove = isModerator || isAuthor;

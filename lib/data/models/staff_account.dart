@@ -3,7 +3,7 @@ import '../../core/constants/user_role.dart';
 
 enum StaffStatus { active, suspended }
 
-/// A Principal, Registrar or Bursar account.
+/// A Principal, Deputy Principal, Registrar, Bursar or other staff account.
 ///
 /// Document ID = Firebase Auth uid. The Principal's app creates Registrar
 /// and Bursar records and flips their status; the first Principal record is
@@ -18,6 +18,10 @@ class StaffAccount {
   final DateTime? createdAt;
   final String? createdBy;
 
+  /// The custom position title ("Askari", "Accountant", ...). Only set for
+  /// [UserRole.staffMember]; the other roles are their own position.
+  final String? position;
+
   const StaffAccount({
     required this.id,
     required this.name,
@@ -26,9 +30,19 @@ class StaffAccount {
     required this.status,
     this.createdAt,
     this.createdBy,
+    this.position,
   });
 
   bool get isActive => status == StaffStatus.active;
+
+  /// What to call this person's position in the UI.
+  String get positionLabel {
+    final custom = position?.trim();
+    if (role == UserRole.staffMember && custom != null && custom.isNotEmpty) {
+      return custom;
+    }
+    return role.label;
+  }
 
   factory StaffAccount.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -55,6 +69,7 @@ class StaffAccount {
       status: status,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       createdBy: data['createdBy'] as String?,
+      position: data['position'] as String?,
     );
   }
 }

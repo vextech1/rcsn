@@ -9,8 +9,9 @@ import '../models/staff_account.dart';
 
 /// Reads and manages staff records. Runs entirely on the free Spark plan:
 /// no Cloud Functions, so the Firestore rules for `staff` are the security
-/// boundary (only the Principal can create a Registrar/Bursar or flip
-/// someone's status; nobody can delete staff).
+/// boundary. The Principal and Deputy Principal can create Registrars,
+/// Bursars and other staff and flip their status; only the Principal can
+/// create or terminate the Deputy Principal; nobody can delete staff.
 ///
 /// Creating an account uses a SECOND Firebase app instance for the Auth
 /// call. Calling createUserWithEmailAndPassword on the default instance
@@ -39,29 +40,66 @@ class StaffRepository {
     return StaffAccount.fromFirestore(doc);
   }
 
-  /// All staff, newest first. Only the Principal is allowed to list.
+  /// All staff, newest first. Only the Principal and Deputy Principal are
+  /// allowed to list.
   Stream<List<StaffAccount>> watchAllStaff() {
     return _staff.orderBy('createdAt', descending: true).snapshots().map(
           (snap) => snap.docs.map(StaffAccount.fromFirestore).toList(),
         );
   }
 
-  /// Creates a Registrar or Bursar, then emails them a link to set their
-  /// own password. The account is created with a random password that
-  /// nobody (including the Principal) ever sees.
+  /// Creates a staff account, then emails them a link to set their own
+  /// password. The account is created with a random password that nobody
+  /// (including whoever created it) ever sees.
+  ///
+  /// [role] is Registrar, Bursar, Deputy Principal (Principal only) or
+  /// [UserRole.staffMember]; for the last one [position] is the title from
+  /// the positions list ("Askari", "Accountant", ...).
   Future<void> createStaff({
     required String name,
     required String email,
     required UserRole role,
+    String? position,
   }) async {
-    if (role != UserRole.registrar && role != UserRole.bursar) {
+    const creatable = [
+      UserRole.registrar,
+      UserRole.bursar,
+      UserRole.deputyPrincipal,
+      UserRole.staffMember,
+    ];
+    if (!creatable.contains(role)) {
       throw const StaffManagementFailure(
-        'Only a Registrar or Bursar can be added. There is one Principal.',
+        'That position cannot be added here. There is one Principal.',
       );
     }
-    final principalUid = _auth.currentUser?.uid;
-    if (principalUid == null) {
+    final positionTitle = position?.trim();
+    if (role == UserRole.staffMember &&
+        (positionTitle == null || positionTitle.length < 2)) {
+      throw const StaffManagementFailure('Choose a position.');
+    }
+    final creatorUid = _auth.currentUser?.uid;
+    if (creatorUid == null) {
       throw const UnauthorizedActionFailure('Please sign in again.');
+    }
+
+    // One Deputy Principal at a time. Checked here, before any login is
+    // created (the rules cannot count records).
+    if (role == UserRole.deputyPrincipal) {
+      try {
+        final existing = await _staff
+            .where('role', isEqualTo: UserRole.deputyPrincipal.name)
+            .where('status', isEqualTo: 'active')
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          throw const StaffManagementFailure(
+            'There is already a Deputy Principal. Terminate them first to '
+            'appoint a new one.',
+          );
+        }
+      } catch (e) {
+        throw _mapWriteError(e);
+      }
     }
 
     final secondary = FirebaseAuth.instanceFor(app: await _secondaryApp());
@@ -92,9 +130,10 @@ class StaffRepository {
           'name': name,
           'email': email,
           'role': role.name,
+          if (role == UserRole.staffMember) 'position': positionTitle,
           'status': 'active',
           'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': principalUid,
+          'createdBy': creatorUid,
         });
       } catch (e) {
         // Do not leave a login with no staff record behind.
@@ -127,21 +166,45 @@ class StaffRepository {
   }
 
   /// Suspend or reactivate someone else. Enforced by the Firestore rules:
-  /// Principal only, never themselves, never the Principal record.
+  /// Principal or Deputy Principal, never themselves, never the Principal
+  /// record. The Deputy Principal's record can only be terminated (suspended,
+  /// one-way) and only by the Principal.
+  ///
+  /// Pass [targetRole] so that terminating the Deputy Principal also frees
+  /// the Deputy Principal option on the Staff screen. Both writes go in one
+  /// batch so they succeed or fail together.
   Future<void> setStatus({
     required String staffId,
     required StaffStatus status,
+    UserRole? targetRole,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       throw const UnauthorizedActionFailure('Please sign in again.');
     }
+    final stamp = <String, Object>{
+      'status': status.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': uid,
+    };
     try {
-      await _staff.doc(staffId).update({
-        'status': status.name,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': uid,
-      });
+      if (targetRole == UserRole.deputyPrincipal &&
+          status == StaffStatus.suspended) {
+        final batch = _firestore.batch();
+        batch.update(_staff.doc(staffId), stamp);
+        batch.set(
+          _firestore
+              .collection('staff_slots')
+              .doc(UserRole.deputyPrincipal.name),
+          {
+            'claimed': false,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+        await batch.commit();
+      } else {
+        await _staff.doc(staffId).update(stamp);
+      }
     } catch (e) {
       throw _mapWriteError(e);
     }
@@ -166,7 +229,7 @@ class StaffRepository {
   AppFailure _mapWriteError(Object e) {
     if (e is FirebaseException && e.code == 'permission-denied') {
       return const UnauthorizedActionFailure(
-        'Only the Principal can manage staff.',
+        'Only the Principal or Deputy Principal can do that.',
       );
     }
     if (e is AppFailure) return e;

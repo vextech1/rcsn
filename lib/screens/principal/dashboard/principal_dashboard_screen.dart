@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/user_role.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/common/dashboard_tile.dart';
 
-/// The Principal landing screen.
+/// The Principal and Deputy Principal landing screen (the Deputy has the
+/// same screens; only the title differs).
 ///
 /// The Principal's own responsibility is staff management. The four
 /// academic tiles are TEMPORARY: until Phase 2 gives the Principal a
@@ -17,9 +19,12 @@ class PrincipalDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDeputy =
+        context.watch<AuthProvider>().resolvedRole == UserRole.deputyPrincipal;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Principal'),
+        title: Text(isDeputy ? 'Deputy Principal' : 'Principal'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),

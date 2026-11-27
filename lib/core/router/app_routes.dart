@@ -17,8 +17,12 @@ class AppRoutes {
   static const String publicNew = '/public/new';
   static const String publicReview = '/public/review';
 
-  // Staff (Principal, Registrar, Bursar share one login)
+  // Staff: everyone who is not a Tutor or Student. They pick a position
+  // first, then share one login. Custom positions (Askari, Accountant, ...)
+  // land on staffHome.
+  static const String staffPositions = '/staff/positions';
   static const String staffLogin = '/staff/login';
+  static const String staffHome = '/staff/home';
 
   // Principal
   static const String principalDashboard = '/principal/dashboard';

@@ -61,6 +61,9 @@ beforeEach(async () => {
     await setDoc(doc(db, 'staff/registrar1'), staff('Registrar', 'registrar'));
     await setDoc(doc(db, 'staff/registrar2'), staff('Suspended', 'registrar', 'suspended'));
     await setDoc(doc(db, 'staff/bursar1'), staff('Bursar', 'bursar'));
+    await setDoc(doc(db, 'staff/deputy1'), staff('Deputy', 'deputyPrincipal'));
+    await setDoc(doc(db, 'staff/deputy2'), staff('Terminated', 'deputyPrincipal', 'suspended'));
+    await setDoc(doc(db, 'staff/askari1'), { ...staff('Askari', 'staffMember'), position: 'Askari' });
     await setDoc(doc(db, 'tutors/tutor1'), { name: 'T', email: 't@example.com', status: 'active' });
     await setDoc(doc(db, 'tutors/tutor2'), { name: 'S', email: 's@example.com', status: 'suspended' });
     await setDoc(doc(db, 'tutors/tutor3'), { name: 'U', email: 'u@example.com', status: 'active' });
@@ -199,6 +202,223 @@ describe('staff collection', () => {
     await assertFails(updateDoc(doc(as('registrar1'), 'staff/bursar1'), statusChange('registrar1', 'suspended')));
     await assertFails(updateDoc(doc(as('registrar2'), 'staff/registrar2'), statusChange('registrar2', 'active')));
     await assertFails(updateDoc(doc(as('bursar1'), 'staff/bursar1'), statusChange('bursar1', 'suspended')));
+  });
+});
+
+describe('deputy principal and custom positions (staff)', () => {
+  const withPosition = (data, position) => ({ ...data, position });
+
+  it('the deputy can read any staff record and list staff', async () => {
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'staff/bursar1')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'staff/principal1')));
+    await assertSucceeds(getDocs(collection(as('deputy1'), 'staff')));
+  });
+
+  it('custom-position staff can read only their own record and cannot list', async () => {
+    await assertSucceeds(getDoc(doc(as('askari1'), 'staff/askari1')));
+    await assertFails(getDoc(doc(as('askari1'), 'staff/bursar1')));
+    await assertFails(getDocs(collection(as('askari1'), 'staff')));
+  });
+
+  it('the principal can appoint the deputy and add custom-position staff', async () => {
+    const db = as('principal1');
+    await assertSucceeds(setDoc(doc(db, 'staff/dep9'), newStaff('principal1', 'deputyPrincipal')));
+    await assertSucceeds(setDoc(doc(db, 'staff/ask9'), withPosition(newStaff('principal1', 'staffMember'), 'Askari')));
+  });
+
+  it('the deputy can add registrar, bursar and custom-position staff, but not another deputy or a principal', async () => {
+    const db = as('deputy1');
+    await assertSucceeds(setDoc(doc(db, 'staff/n1'), newStaff('deputy1', 'registrar')));
+    await assertSucceeds(setDoc(doc(db, 'staff/n2'), newStaff('deputy1', 'bursar')));
+    await assertSucceeds(setDoc(doc(db, 'staff/n3'), withPosition(newStaff('deputy1', 'staffMember'), 'Accountant')));
+    await assertFails(setDoc(doc(db, 'staff/n4'), newStaff('deputy1', 'deputyPrincipal')));
+    await assertFails(setDoc(doc(db, 'staff/n5'), newStaff('deputy1', 'principal')));
+  });
+
+  it('nobody else can create staff, including custom-position staff', async () => {
+    const rec = withPosition(newStaff('askari1', 'staffMember'), 'Askari');
+    await assertFails(setDoc(doc(as('askari1'), 'staff/m1'), rec));
+    await assertFails(setDoc(doc(as('registrar1'), 'staff/m2'), withPosition(newStaff('registrar1', 'staffMember'), 'Askari')));
+    await assertFails(setDoc(doc(as('tutor1'), 'staff/m3'), withPosition(newStaff('tutor1', 'staffMember'), 'Askari')));
+    await assertFails(setDoc(doc(anon(), 'staff/m4'), withPosition(newStaff('principal1', 'staffMember'), 'Askari')));
+  });
+
+  it('a custom position needs a sensible title, and only custom-position staff carry one', async () => {
+    const db = as('principal1');
+    await assertFails(setDoc(doc(db, 'staff/p1'), newStaff('principal1', 'staffMember')));
+    await assertFails(setDoc(doc(db, 'staff/p2'), withPosition(newStaff('principal1', 'staffMember'), 'A')));
+    await assertFails(setDoc(doc(db, 'staff/p3'), withPosition(newStaff('principal1', 'staffMember'), 'x'.repeat(61))));
+    await assertFails(setDoc(doc(db, 'staff/p4'), withPosition(newStaff('principal1', 'staffMember'), 42)));
+    await assertFails(setDoc(doc(db, 'staff/p5'), withPosition(newStaff('principal1', 'registrar'), 'Askari')));
+  });
+
+  it('the deputy can suspend and reactivate registrar, bursar and custom-position staff', async () => {
+    const db = as('deputy1');
+    await assertSucceeds(updateDoc(doc(db, 'staff/bursar1'), statusChange('deputy1', 'suspended')));
+    await assertSucceeds(updateDoc(doc(db, 'staff/askari1'), statusChange('deputy1', 'suspended')));
+    await assertSucceeds(updateDoc(doc(db, 'staff/registrar2'), statusChange('deputy1', 'active')));
+  });
+
+  it('the deputy cannot touch the principal or the deputy record', async () => {
+    const db = as('deputy1');
+    await assertFails(updateDoc(doc(db, 'staff/principal1'), statusChange('deputy1', 'suspended')));
+    await assertFails(updateDoc(doc(db, 'staff/deputy1'), statusChange('deputy1', 'suspended')));
+    await assertFails(updateDoc(doc(db, 'staff/deputy2'), statusChange('deputy1', 'active')));
+  });
+
+  it('only the principal can terminate the deputy, and termination is one-way', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'staff/deputy1'), statusChange('principal1', 'suspended')));
+    await assertFails(updateDoc(doc(as('principal1'), 'staff/deputy2'), statusChange('principal1', 'active')));
+    await assertFails(updateDoc(doc(as('registrar1'), 'staff/deputy1'), statusChange('registrar1', 'suspended')));
+    await assertFails(updateDoc(doc(as('askari1'), 'staff/deputy1'), statusChange('askari1', 'suspended')));
+  });
+
+  it('a terminated deputy loses all staff powers at once', async () => {
+    await assertSucceeds(updateDoc(doc(as('principal1'), 'staff/deputy1'), statusChange('principal1', 'suspended')));
+    await assertFails(getDocs(collection(as('deputy1'), 'staff')));
+    await assertFails(setDoc(doc(as('deputy1'), 'staff/late1'), newStaff('deputy1', 'registrar')));
+    await assertFails(setDoc(doc(as('deputy1'), 'subjects/late2'), subject));
+  });
+
+  it('custom-position staff cannot change anyone\'s status', async () => {
+    await assertFails(updateDoc(doc(as('askari1'), 'staff/bursar1'), statusChange('askari1', 'suspended')));
+    await assertFails(updateDoc(doc(as('askari1'), 'staff/askari1'), statusChange('askari1', 'active')));
+  });
+});
+
+describe('staff_positions (the list on the Staff screen)', () => {
+  const newPosition = (createdBy, title = 'Askari') => ({
+    title,
+    createdAt: serverTimestamp(),
+    createdBy,
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'staff_positions/pos1'), { title: 'Accountant', createdBy: 'principal1', createdAt: new Date() });
+    });
+  });
+
+  it('anyone can read the list without signing in', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'staff_positions/pos1')));
+    await assertSucceeds(getDocs(collection(anon(), 'staff_positions')));
+  });
+
+  it('the principal and the deputy can add a position', async () => {
+    await assertSucceeds(setDoc(doc(as('principal1'), 'staff_positions/a1'), newPosition('principal1')));
+    await assertSucceeds(setDoc(doc(as('deputy1'), 'staff_positions/a2'), newPosition('deputy1', 'Clinical Instructor')));
+  });
+
+  it('nobody else can add a position', async () => {
+    await assertFails(setDoc(doc(as('registrar1'), 'staff_positions/b1'), newPosition('registrar1')));
+    await assertFails(setDoc(doc(as('bursar1'), 'staff_positions/b2'), newPosition('bursar1')));
+    await assertFails(setDoc(doc(as('askari1'), 'staff_positions/b3'), newPosition('askari1')));
+    await assertFails(setDoc(doc(as('tutor1'), 'staff_positions/b4'), newPosition('tutor1')));
+    await assertFails(setDoc(doc(anon(), 'staff_positions/b5'), newPosition('principal1')));
+    await assertFails(setDoc(doc(as('registrar2'), 'staff_positions/b6'), newPosition('registrar2')));
+  });
+
+  it('a position must be well-formed', async () => {
+    const db = as('principal1');
+    await assertFails(setDoc(doc(db, 'staff_positions/c1'), newPosition('principal1', 'A')));
+    await assertFails(setDoc(doc(db, 'staff_positions/c2'), newPosition('principal1', 'x'.repeat(61))));
+    await assertFails(setDoc(doc(db, 'staff_positions/c3'), newPosition('someone-else')));
+    await assertFails(setDoc(doc(db, 'staff_positions/c4'), { ...newPosition('principal1'), extra: true }));
+    await assertFails(setDoc(doc(db, 'staff_positions/c5'), { ...newPosition('principal1'), createdAt: new Date(0) }));
+  });
+
+  it('positions are never edited; the principal and deputy can remove them, nobody else', async () => {
+    await assertFails(updateDoc(doc(as('principal1'), 'staff_positions/pos1'), { title: 'Renamed' }));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'staff_positions/pos1')));
+    await assertFails(deleteDoc(doc(as('askari1'), 'staff_positions/pos1')));
+    await assertFails(deleteDoc(doc(anon(), 'staff_positions/pos1')));
+    await assertSucceeds(deleteDoc(doc(as('deputy1'), 'staff_positions/pos1')));
+  });
+});
+
+describe('staff_slots (is the Principal / Deputy option taken?)', () => {
+  const slot = (claimed) => ({ claimed, updatedAt: serverTimestamp() });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'staff_slots/principal'), { claimed: true, updatedAt: new Date() });
+      await setDoc(doc(db, 'staff_slots/deputyPrincipal'), { claimed: true, updatedAt: new Date() });
+    });
+  });
+
+  it('anyone can read a slot, but nobody can list them', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'staff_slots/principal')));
+    await assertSucceeds(getDoc(doc(anon(), 'staff_slots/deputyPrincipal')));
+    await assertFails(getDocs(collection(anon(), 'staff_slots')));
+  });
+
+  it('the principal marks their own slot taken, and nobody else can', async () => {
+    await assertSucceeds(setDoc(doc(as('principal1'), 'staff_slots/principal'), slot(true)));
+    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/principal'), slot(true)));
+    await assertFails(setDoc(doc(as('registrar1'), 'staff_slots/principal'), slot(true)));
+    await assertFails(setDoc(doc(anon(), 'staff_slots/principal'), slot(true)));
+  });
+
+  it('the deputy marks their own slot taken; the principal cannot do it for them', async () => {
+    await assertSucceeds(setDoc(doc(as('deputy1'), 'staff_slots/deputyPrincipal'), slot(true)));
+    await assertFails(setDoc(doc(as('principal1'), 'staff_slots/deputyPrincipal'), slot(true)));
+    await assertFails(setDoc(doc(as('askari1'), 'staff_slots/deputyPrincipal'), slot(true)));
+  });
+
+  it('a terminated deputy cannot mark the slot taken again', async () => {
+    await assertFails(setDoc(doc(as('deputy2'), 'staff_slots/deputyPrincipal'), slot(true)));
+  });
+
+  it('only the principal can reopen the deputy slot, and the principal slot never reopens', async () => {
+    await assertSucceeds(setDoc(doc(as('principal1'), 'staff_slots/deputyPrincipal'), slot(false)));
+    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/deputyPrincipal'), slot(false)));
+    await assertFails(setDoc(doc(as('registrar1'), 'staff_slots/deputyPrincipal'), slot(false)));
+    await assertFails(setDoc(doc(as('principal1'), 'staff_slots/principal'), slot(false)));
+    await assertFails(setDoc(doc(as('deputy1'), 'staff_slots/principal'), slot(false)));
+  });
+
+  it('a slot write must be well-formed, only for the two slots, and never deleted', async () => {
+    const db = as('principal1');
+    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: 'yes', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { ...slot(true), extra: 1 }));
+    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: true, updatedAt: new Date(0) }));
+    await assertFails(setDoc(doc(db, 'staff_slots/principal'), { claimed: true }));
+    await assertFails(setDoc(doc(db, 'staff_slots/registrar'), slot(true)));
+    await assertFails(deleteDoc(doc(db, 'staff_slots/principal')));
+  });
+});
+
+describe('deputy principal in the rest of the app', () => {
+  it('the deputy can create and edit academic structure like the principal', async () => {
+    await assertSucceeds(setDoc(doc(as('deputy1'), 'subjects/ds1'), subject));
+    await assertSucceeds(updateDoc(doc(as('deputy1'), 'students/stu1'), { status: 'suspended' }));
+  });
+
+  it('custom-position staff cannot write academic structure', async () => {
+    await assertFails(setDoc(doc(as('askari1'), 'subjects/ds2'), subject));
+    await assertFails(updateDoc(doc(as('askari1'), 'students/stu1'), { status: 'suspended' }));
+  });
+
+  it('the deputy publishes to the Public Space as themselves, like the principal', async () => {
+    await assertSucceeds(setDoc(doc(as('deputy1'), 'public_posts/d1'), newPost('deputy1', 'Deputy', 'deputyPrincipal', 'published')));
+    await assertFails(setDoc(doc(as('deputy1'), 'public_posts/d2'), newPost('deputy1', 'Deputy', 'principal', 'published')));
+  });
+
+  it('custom-position staff can read the Public Space but cannot post', async () => {
+    await assertSucceeds(getDoc(doc(as('askari1'), 'public_posts/pub1')));
+    await assertFails(setDoc(doc(as('askari1'), 'public_posts/k1'), newPost('askari1', 'Askari', 'staffMember', 'published')));
+    await assertFails(setDoc(doc(as('askari1'), 'public_posts/k2'), newPost('askari1', 'Askari', 'staffMember', 'pending')));
+  });
+
+  it('the deputy moderates like the principal; custom-position staff cannot', async () => {
+    const stamp = (uid, status) => ({ status, reviewedBy: uid, reviewedAt: serverTimestamp() });
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'public_posts/pend1')));
+    await assertSucceeds(updateDoc(doc(as('deputy1'), 'public_posts/pend1'), stamp('deputy1', 'published')));
+    await assertSucceeds(deleteDoc(doc(as('deputy1'), 'public_posts/pub1')));
+    await assertFails(getDoc(doc(as('askari1'), 'public_posts/pend1')));
+    await assertFails(updateDoc(doc(as('askari1'), 'public_posts/pend1'), stamp('askari1', 'published')));
+    await assertFails(deleteDoc(doc(as('askari1'), 'public_posts/pend1')));
   });
 });
 

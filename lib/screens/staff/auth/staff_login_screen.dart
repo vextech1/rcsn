@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/errors/app_failure.dart';
+import '../../../data/models/staff_position.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/forms/app_text_field.dart';
 
-/// Staff login, shared by Principal, Registrar and Bursar.
+/// Staff login, shared by every staff position (Principal, Deputy Principal,
+/// Registrar, Bursar and the custom positions).
+///
+/// [position] is what the person picked on the Staff screen. It is passed to
+/// [AuthProvider.signIn], which rejects the sign-in if the account is in a
+/// different position. It is null when the router sent someone here (for
+/// example a signed-out visit to a staff-only screen); the sign-in then works
+/// as before and the account alone decides the dashboard.
 ///
 /// Uses [AuthProvider.signIn], same as Tutor login. Which dashboard the
 /// person lands on is decided after sign-in by AuthProvider (reading the
 /// `staff` record) and the router guard, not by this screen. There is no
-/// register link: staff accounts are created by the Principal.
+/// register link: staff accounts are created by the Principal or Deputy
+/// Principal.
 ///
 /// IMPORTANT: this screen watches AuthProvider directly (via
 /// context.watch) rather than only catching what signIn() throws.
@@ -19,7 +28,9 @@ import '../../../widgets/forms/app_text_field.dart';
 /// reach this screen. Watching [AuthProvider.lastError] and
 /// [AuthProvider.isResolving] closes that gap.
 class StaffLoginScreen extends StatefulWidget {
-  const StaffLoginScreen({super.key});
+  final StaffPosition? position;
+
+  const StaffLoginScreen({super.key, this.position});
 
   @override
   State<StaffLoginScreen> createState() => _StaffLoginScreenState();
@@ -48,6 +59,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       await context.read<AuthProvider>().signIn(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            position: widget.position,
           );
       // No manual navigation here. The router's redirect guard sends a
       // resolved staff session to the right dashboard on its own. If
@@ -77,7 +89,13 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     final isBusy = _isSubmitting || auth.isResolving;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Staff Login')),
+      appBar: AppBar(
+        title: Text(
+          widget.position == null
+              ? 'Staff Login'
+              : '${widget.position!.title} Login',
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -86,6 +104,13 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
+              if (widget.position != null && !widget.position!.isSingleHolder) ...[
+                const Text(
+                  'Your account is created by the Principal or Deputy '
+                  'Principal. If you do not have one yet, ask them to add you.',
+                ),
+                const SizedBox(height: 20),
+              ],
               AppTextField(
                 controller: _emailController,
                 label: 'Email',
