@@ -7,10 +7,12 @@ import '../../../core/constants/user_role.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/utils/student_number.dart';
+import '../../../data/models/attendance.dart';
 import '../../../data/models/coursework.dart';
 import '../../../data/models/student_record.dart';
 import '../../../data/models/subject.dart';
 import '../../../data/models/timetable.dart';
+import '../../../data/repositories/attendance_repository.dart';
 import '../../../data/repositories/coursework_repository.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../data/repositories/structure_repository.dart';
@@ -18,6 +20,7 @@ import '../../../data/repositories/student_bio_repository.dart';
 import '../../../data/repositories/timetable_repository.dart';
 import '../../../data/repositories/tutor_repository.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../widgets/attendance/attendance_list.dart';
 import '../../../widgets/coursework/coursework_list.dart';
 
 /// Everything on record about one student, read-only.
@@ -39,6 +42,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   late final _subjects = _loadSubjects();
   late final _timetables = _loadTimetables();
   late final _coursework = CourseworkRepository().forStudent(_student.nsin);
+  late final _attendance = AttendanceRepository().watch(_student.nsin).first;
   late final _fees =
       _showFees ? FeeRepository().recordsForStudent(_student.nsin) : null;
 
@@ -191,6 +195,30 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 const Text('No coursework recorded.')
               else
                 CourseworkList(entries: entries, showStatus: true),
+            ],
+          ),
+          // The Registrar issues documents; the rules let only the
+          // Registrar change the template.
+          if (context.read<AuthProvider>().resolvedRole ==
+              UserRole.registrar) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => context.push(
+                AppRoutes.registrarDocuments,
+                extra: _student,
+              ),
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('Result slip or transcript'),
+            ),
+          ],
+          _heading('Attendance'),
+          _section<List<Attendance>>(
+            _attendance,
+            (items) => [
+              if (items.isEmpty)
+                const Text('No attendance recorded.')
+              else
+                AttendanceList(items: items),
             ],
           ),
           _heading('UHPAB results'),

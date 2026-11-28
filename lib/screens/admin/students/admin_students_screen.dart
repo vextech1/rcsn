@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../core/constants/user_role.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/academic_structure.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/router/app_routes.dart';
@@ -348,6 +351,11 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                       AppRoutes.registrarPlacements,
                       extra: student,
                     );
+                  } else if (choice == 'documents') {
+                    context.push(
+                      AppRoutes.registrarDocuments,
+                      extra: student,
+                    );
                   } else if (choice == 'uhpab') {
                     context.push(AppRoutes.registrarUhpab, extra: student);
                   } else {
@@ -363,6 +371,12 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                     value: 'uhpab',
                     child: Text('UHPAB results'),
                   ),
+                  if (context.read<AuthProvider>().resolvedRole ==
+                      UserRole.registrar)
+                    const PopupMenuItem(
+                      value: 'documents',
+                      child: Text('Result slip or transcript'),
+                    ),
                   const PopupMenuItem(
                     value: 'placements',
                     child: Text('Clinical placements'),
