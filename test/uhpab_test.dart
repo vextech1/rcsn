@@ -11,7 +11,7 @@ void main() {
       );
 
   test('grades follow the national scale', () {
-    const expected = {
+    final expected = <double, String>{
       100.0: 'A', 80.0: 'A', 79.9: 'B+', 75.0: 'B+', 70.0: 'B',
       65.0: 'C+', 60.0: 'C', 55.0: 'D+', 50.0: 'D', 49.9: 'F', 0.0: 'F',
     };
