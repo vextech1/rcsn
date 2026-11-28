@@ -75,7 +75,11 @@ class _PrincipalSetupScreenState extends State<PrincipalSetupScreen> {
     // Registered. Sign in, then let the router take over: the signed-in
     // Principal is sent to their dashboard by the usual role guard.
     try {
-      await auth.signIn(email: email, password: password);
+      await auth.signIn(
+        email: email,
+        password: password,
+        door: LoginDoor.staff,
+      );
     } on AppFailure {
       // Registered but the automatic sign-in failed (rare). They can sign
       // in from the Staff screen.

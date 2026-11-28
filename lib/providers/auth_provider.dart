@@ -231,6 +231,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     _lastError = null;
     _errorAfterSignOut = null;
+    _selectedDoor = null;
+    _selectedPosition = null;
     notifyListeners();
     await _authService.signOut();
   }

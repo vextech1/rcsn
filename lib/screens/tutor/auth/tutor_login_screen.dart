@@ -6,11 +6,10 @@ import '../../../core/errors/app_failure.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/forms/app_text_field.dart';
 
-/// Tutor login. Shares [AuthProvider.signIn] with Admin login (once that
-/// screen exists) — the same method per Section 2.4's permission table
-/// showing both roles use email+password, and role resolution after
-/// sign-in is AuthProvider's job (checking StaffRepository then
-/// TutorRepository), not something this screen decides.
+/// Tutor login. Shares [AuthProvider.signIn] with the staff login (same
+/// email + password method). It signs in through [LoginDoor.tutor], so a
+/// staff account entered here is rejected by AuthProvider instead of being
+/// accepted and sent to a staff dashboard.
 class TutorLoginScreen extends StatefulWidget {
   const TutorLoginScreen({super.key});
 
@@ -60,6 +59,13 @@ class _TutorLoginScreenState extends State<TutorLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Also watch AuthProvider: a staff account entered here is rejected
+    // after sign-in, during role resolution, and that message reaches
+    // AuthProvider.lastError rather than anything signIn() throws.
+    final auth = context.watch<AuthProvider>();
+    final error = _error ?? auth.lastError;
+    final isBusy = _isSubmitting || auth.isResolving;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Tutor Login')),
       body: SingleChildScrollView(
@@ -83,14 +89,14 @@ class _TutorLoginScreenState extends State<TutorLoginScreen> {
                 controller: _passwordController,
                 label: 'Password',
                 obscureText: true,
-                error: _error,
+                error: error,
                 validator: (v) =>
                     (v == null || v.isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
+                onPressed: isBusy ? null : _submit,
+                child: isBusy
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -103,7 +109,7 @@ class _TutorLoginScreenState extends State<TutorLoginScreen> {
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: _isSubmitting
+                onPressed: isBusy
                     ? null
                     : () => context.go(AppRoutes.tutorRegister),
                 child: const Text("Don't have an account? Register"),
