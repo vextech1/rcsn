@@ -110,6 +110,33 @@ const Map<ProgramType, Map<(int, int), List<CourseUnit>>> kCourseCatalogue = {
       CourseUnit('DNE 214', 'Practicals'),
     ],
   },
+
+  // Diploma Extension Midwifery (DME): the same three semesters and coding as
+  // Diploma Extension Nursing. Year 1 has four papers and Year 2 semester 1
+  // has three; each semester's practical takes the next code (115, 125, 214)
+  // and is listed by its code alone ("Practicals").
+  ProgramType.diplomaExtensionMidwifery: {
+    (1, 1): [
+      CourseUnit('DME 111', 'Midwifery I and Obstetric Anatomy'),
+      CourseUnit('DME 112', 'Gynaecology and Reproductive Health'),
+      CourseUnit('DME 113', 'Mental Health and Pharmacology'),
+      CourseUnit('DME 114', 'Tropical Medicine and Community Health'),
+      CourseUnit('DME 115', 'Practicals'),
+    ],
+    (1, 2): [
+      CourseUnit('DME 121', 'Midwifery II'),
+      CourseUnit('DME 122', 'Applied Research and Teaching Methodology'),
+      CourseUnit('DME 123', 'Paediatric Nursing I and Palliative Care'),
+      CourseUnit('DME 124', 'Disaster Management, Occupational Health and Safety'),
+      CourseUnit('DME 125', 'Practicals'),
+    ],
+    (2, 1): [
+      CourseUnit('DME 211', 'Midwifery III'),
+      CourseUnit('DME 212', 'Paediatric Nursing II'),
+      CourseUnit('DME 213', 'Health Service Management and Entrepreneurship'),
+      CourseUnit('DME 214', 'Practicals'),
+    ],
+  },
 };
 
 List<CourseUnit> standardUnits(ProgramType programType, int year, int semester) =>
