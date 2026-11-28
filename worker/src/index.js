@@ -145,7 +145,7 @@ async function authorize(request, env, subjectId) {
     const uid = await verifyIdToken(token, env.FIREBASE_PROJECT_ID);
 
     const staff = await getDoc(env, `staff/${uid}`, token);
-    if (staff?.status === 'active' && ['principal', 'registrar'].includes(staff.role)) {
+    if (staff?.status === 'active' && ['principal', 'deputyPrincipal', 'registrar'].includes(staff.role)) {
       return { uid, admin: true };
     }
     const tutor = await getDoc(env, `tutors/${uid}`, token);

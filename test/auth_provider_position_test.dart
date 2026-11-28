@@ -218,6 +218,20 @@ void main() {
     expect(auth.lastError?.message, contains('Bursar'));
   });
 
+  test('Registrar signing in through the Tutor login is rejected', () async {
+    final auth = _provider();
+    await auth.signIn(
+      email: 'registrar@rcsn.test',
+      password: 'x',
+      door: LoginDoor.tutor,
+    );
+    await _settle();
+
+    expect(auth.resolvedRole, isNull);
+    expect(auth.isSignedIn, isFalse);
+    expect(auth.lastError?.message, contains('Registrar'));
+  });
+
   test('Tutor signing in through the Tutor login is accepted', () async {
     final auth = _provider();
     await auth.signIn(

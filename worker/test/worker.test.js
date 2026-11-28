@@ -26,6 +26,9 @@ const doc = (o) => ({
 const DOCS = {
   'staff/boss': { role: 'principal', status: 'active' },
   'staff/money': { role: 'bursar', status: 'active' },
+  'staff/deputy': { role: 'deputyPrincipal', status: 'active' },
+  'staff/oldDeputy': { role: 'deputyPrincipal', status: 'suspended' },
+  'staff/reg': { role: 'registrar', status: 'active' },
   'tutors/t1': { status: 'active' },
   'tutors/t2': { status: 'active' },
   'tutors/t3': { status: 'suspended' },
@@ -92,10 +95,15 @@ describe('upload', () => {
   it('lets the principal upload', async () => {
     assert.equal(await status('PUT', 'a.docx', as('boss'), 'x'), 201);
   });
+  it('lets the deputy principal and the registrar upload', async () => {
+    assert.equal(await status('PUT', 'd.docx', as('deputy'), 'x'), 201);
+    assert.equal(await status('PUT', 'r.docx', as('reg'), 'x'), 201);
+  });
   it('refuses everyone else', async () => {
     assert.equal(await status('PUT', 'b.pdf', {}, 'x'), 401);
     assert.equal(await status('PUT', 'b.pdf', as('stranger'), 'x'), 403);
     assert.equal(await status('PUT', 'b.pdf', as('money'), 'x'), 403);
+    assert.equal(await status('PUT', 'b.pdf', as('oldDeputy'), 'x'), 403);
     assert.equal(await status('PUT', 'b.pdf', as('t3'), 'x'), 403);
     assert.equal(await status('PUT', 'b.pdf', as('t1'), 'x', 'other-subject'), 403);
     assert.equal(await status('PUT', 'b.pdf', nsin('001'), 'x'), 403);
