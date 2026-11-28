@@ -36,6 +36,8 @@ import '../../screens/registrar/discipline/discipline_screen.dart';
 import '../../screens/student/discipline/student_discipline_screen.dart';
 import '../../screens/registrar/placements/placements_screen.dart';
 import '../../screens/student/placements/student_placements_screen.dart';
+import '../../screens/registrar/attendance/attendance_screen.dart';
+import '../../screens/student/attendance/student_attendance_screen.dart';
 import '../../data/models/student_record.dart';
 import '../../screens/registrar/student_number/student_number_format_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
@@ -211,6 +213,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarTutors, builder: (_, __) => const AdminTutorsScreen()),
       GoRoute(path: AppRoutes.registrarStudents, builder: (_, __) => const AdminStudentsScreen()),
       GoRoute(path: AppRoutes.registrarCoursework, builder: (_, __) => const CourseworkScreen()),
+      GoRoute(path: AppRoutes.registrarAttendance, builder: (_, __) => const AttendanceScreen()),
       GoRoute(path: AppRoutes.registrarContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
 
       GoRoute(
@@ -307,6 +310,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.studentUhpab, builder: (_, __) => const StudentUhpabScreen()),
       GoRoute(path: AppRoutes.studentDiscipline, builder: (_, __) => const StudentDisciplineScreen()),
       GoRoute(path: AppRoutes.studentPlacements, builder: (_, __) => const StudentPlacementsScreen()),
+      GoRoute(path: AppRoutes.studentAttendance, builder: (_, __) => const StudentAttendanceScreen()),
       GoRoute(path: AppRoutes.studentSettings, builder: (_, __) => const StudentSettingsScreen()),
       GoRoute(path: AppRoutes.studentAccountInactive, builder: (_, __) => const StudentAccountInactiveScreen()),
     ],

@@ -951,6 +951,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Attendance, one document per student. A student opens their own by
+    // number; only staff may search, to fill a class list.
+    match /student_attendance/{key} {
+      allow get: if true;
+      allow list: if isRegistrar() || isPrincipalLevel();
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'units', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.get('units', {}) is map
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
     // Student number formats, set by the Academic Registrar. The app checks
     // numbers against them; public, because students check before signing in.
     match /settings/studentNumber {

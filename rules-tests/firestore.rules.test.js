@@ -1146,3 +1146,40 @@ describe('clinical placements', () => {
     await assertFails(deleteDoc(doc(as('registrar1'), 'student_placements/ABC_1')));
   });
 });
+
+describe('attendance', () => {
+  const record = (uid, units) => ({ nsin: 'ABC/1', units, updatedBy: uid, updatedAt: serverTimestamp() });
+  const set = (uid, id, value) =>
+    setDoc(doc(as(uid), 'student_attendance/ABC_1'), record(uid, { [id]: value }), {
+      mergeFields: ['nsin', `units.${id}`, 'updatedBy', 'updatedAt'],
+    });
+  const unit = { subjectName: 'CN 111', year: 1, semester: 1, percent: 90 };
+  // What the app asks for: everyone with a record in one course unit.
+  const inUnit = (db, id) =>
+    getDocs(query(collection(db, 'student_attendance'), where(`units.${id}.year`, '>', 0)));
+
+  it('the registrar records and removes one course unit at a time', async () => {
+    await assertSucceeds(set('registrar1', 's1', unit));
+    await assertSucceeds(set('registrar1', 's2', unit));
+    assert.strictEqual((await inUnit(as('registrar1'), 's1')).size, 1);
+    await assertSucceeds(set('registrar1', 's1', deleteField()));
+    assert.strictEqual((await inUnit(as('registrar1'), 's1')).size, 0);
+    assert.strictEqual((await inUnit(as('principal1'), 's2')).size, 1);
+  });
+
+  it('only the registrar writes', async () => {
+    for (const uid of ['principal1', 'deputy1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(set(uid, 's1', unit));
+    }
+    await assertFails(setDoc(doc(anon(), 'student_attendance/ABC_1'), record('x', {})));
+  });
+
+  it('a student opens their own; only staff search; nothing is deleted', async () => {
+    await assertSucceeds(set('registrar1', 's1', unit));
+    await assertSucceeds(getDoc(doc(anon(), 'student_attendance/ABC_1')));
+    await assertFails(inUnit(anon(), 's1'));
+    await assertFails(inUnit(as('tutor1'), 's1'));
+    await assertFails(inUnit(as('bursar1'), 's1'));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'student_attendance/ABC_1')));
+  });
+});

@@ -17,6 +17,7 @@ import '../../../data/services/notification_service.dart';
 import '../../../providers/student_provider.dart';
 import '../../../widgets/common/app_empty_state.dart';
 import '../../../widgets/common/app_error_display.dart';
+import '../../../widgets/attendance/attendance_tile.dart';
 import '../../../widgets/common/app_loading_indicator.dart';
 import '../../../widgets/discipline/discipline_tile.dart';
 import '../../../widgets/placement/placement_tile.dart';
@@ -179,6 +180,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               title: const Text('My fees'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(AppRoutes.studentFees),
+            ),
+
+            AttendanceTile(
+              key: ValueKey('attendance ${student.nsin}'),
+              nsin: student.nsin,
             ),
 
             PlacementTile(
