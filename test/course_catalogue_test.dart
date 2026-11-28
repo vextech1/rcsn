@@ -120,6 +120,63 @@ void main() {
     );
   });
 
+  test('Diploma Extension Midwifery units are as the curriculum lists them', () {
+    const dme = ProgramType.diplomaExtensionMidwifery;
+    List<String> codes(int year, int semester) =>
+        standardUnits(dme, year, semester).map((u) => u.code).toList();
+    String title(int year, int semester, String code) => standardUnits(
+          dme,
+          year,
+          semester,
+        ).firstWhere((u) => u.code == code).title;
+
+    // Every class of the track is covered, and no other class is invented.
+    final semesters = kTrackDefinitions[dme]!.semestersPerYear;
+    expect(semesters, {1: 2, 2: 1});
+    expect(
+      kCourseCatalogue[dme]!.keys.toSet(),
+      {(1, 1), (1, 2), (2, 1)},
+    );
+
+    expect(codes(1, 1), ['DME 111', 'DME 112', 'DME 113', 'DME 114', 'DME 115']);
+    expect(codes(1, 2), ['DME 121', 'DME 122', 'DME 123', 'DME 124', 'DME 125']);
+    expect(codes(2, 1), ['DME 211', 'DME 212', 'DME 213', 'DME 214']);
+
+    expect(title(1, 1, 'DME 111'), 'Midwifery I and Obstetric Anatomy');
+    expect(title(1, 1, 'DME 112'), 'Gynaecology and Reproductive Health');
+    expect(title(1, 1, 'DME 113'), 'Mental Health and Pharmacology');
+    expect(title(1, 1, 'DME 114'), 'Tropical Medicine and Community Health');
+    expect(title(1, 2, 'DME 121'), 'Midwifery II');
+    expect(title(1, 2, 'DME 122'), 'Applied Research and Teaching Methodology');
+    expect(title(1, 2, 'DME 123'), 'Paediatric Nursing I and Palliative Care');
+    expect(title(1, 2, 'DME 124'),
+        'Disaster Management, Occupational Health and Safety');
+    expect(title(2, 1, 'DME 211'), 'Midwifery III');
+    expect(title(2, 1, 'DME 212'), 'Paediatric Nursing II');
+    expect(title(2, 1, 'DME 213'),
+        'Health Service Management and Entrepreneurship');
+
+    // The practicals are 115, 125 and 214, each listed as "Practicals".
+    expect(
+      [
+        for (final units in kCourseCatalogue[dme]!.values)
+          for (final u in units)
+            if (u.title == 'Practicals') u.code,
+      ],
+      ['DME 115', 'DME 125', 'DME 214'],
+    );
+  });
+
+  test('DME and DNE share some titles but never the same subject id', () {
+    final dme = standardUnits(ProgramType.diplomaExtensionMidwifery, 1, 2)[1];
+    final dne = standardUnits(ProgramType.diplomaExtensionNursing, 1, 2)[1];
+    expect(dme.title, dne.title); // Applied Research and Teaching Methodology
+    expect(
+      standardSubjectId(ProgramType.diplomaExtensionMidwifery, dme),
+      isNot(standardSubjectId(ProgramType.diplomaExtensionNursing, dne)),
+    );
+  });
+
   test('Midwifery and Nursing papers never collide', () {
     final nursing = standardUnits(ProgramType.certificateNursing, 1, 1)[0];
     final midwifery = standardUnits(ProgramType.certificateMidwifery, 1, 1)[0];
