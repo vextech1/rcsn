@@ -82,6 +82,9 @@ class AppRoutes {
   static const String feeLookup = '/fee-lookup';
   static const String studentFees = '/student/fees';
   static const String studentResults = '/student/results';
+  static const String studentUhpab = '/student/uhpab';
+  static const String registrarUhpab = '/registrar/students/uhpab';
+  static const String bursarResultAccess = '/bursar/results-access';
   static const String studentSettings = '/student/settings';
   static const String studentAccountInactive = '/student/account-inactive';
 }

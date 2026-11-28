@@ -875,6 +875,33 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // UHPAB results, typed marks and the list of uploaded documents. Students
+    // never read this: the Worker does, and applies the fee block.
+    match /uhpab_results/{key} {
+      allow read: if isRegistrar() || isPrincipalLevel();
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'units', 'documents', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.get('units', {}) is map
+        && request.resource.data.get('documents', {}) is map
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
+    // The Bursar's permission for a student to see UHPAB results despite
+    // unpaid or unrecorded fees.
+    match /result_clearance/{key} {
+      allow read: if isBursar() || isRegistrar() || isPrincipalLevel();
+      allow create, update: if isBursar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'allowed', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.allowed is bool
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
     // Student number formats, set by the Academic Registrar. The app checks
     // numbers against them; public, because students check before signing in.
     match /settings/studentNumber {

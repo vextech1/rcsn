@@ -193,6 +193,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 CourseworkList(entries: entries, showStatus: true),
             ],
           ),
+          _heading('UHPAB results'),
+          OutlinedButton.icon(
+            onPressed: () => context.push(
+              AppRoutes.registrarUhpab,
+              extra: _student,
+            ),
+            icon: const Icon(Icons.workspace_premium),
+            label: const Text('Open UHPAB results'),
+          ),
           _heading('Timetables'),
           _section<List<Timetable>>(
             _timetables,

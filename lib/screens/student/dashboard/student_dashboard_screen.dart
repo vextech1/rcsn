@@ -162,6 +162,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
 
           ListTile(
+            leading: const Icon(Icons.workspace_premium,
+                color: AppColors.primary),
+            title: const Text('My UHPAB results'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.studentUhpab),
+          ),
+
+          ListTile(
             leading: const Icon(Icons.payments, color: AppColors.primary),
             title: const Text('My fees'),
             trailing: const Icon(Icons.chevron_right),

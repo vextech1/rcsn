@@ -39,6 +39,11 @@ class _BursarDashboardScreenState extends State<BursarDashboardScreen> {
         actions: [
           if (!widget.readOnly) ...[
           IconButton(
+            icon: const Icon(Icons.fact_check),
+            tooltip: 'UHPAB result access',
+            onPressed: () => context.push(AppRoutes.bursarResultAccess),
+          ),
+          IconButton(
             icon: const Icon(Icons.groups),
             tooltip: 'Class tuition',
             onPressed: () => context.push(AppRoutes.bursarBulk),

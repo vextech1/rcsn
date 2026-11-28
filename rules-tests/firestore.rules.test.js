@@ -1022,3 +1022,38 @@ describe('coursework and published results', () => {
     await assertFails(deleteDoc(doc(as('registrar1'), 'student_results/ABC_1')));
   });
 });
+
+describe('UHPAB results and the Bursar\'s permission', () => {
+  const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const results = (uid) => ({ nsin: 'ABC/1', units: {}, documents: {}, ...stamp(uid) });
+  const clearance = (uid, allowed = true) => ({ nsin: 'ABC/1', allowed, ...stamp(uid) });
+
+  it('the registrar writes results; principal level reads them', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'uhpab_results/ABC_1'), results('registrar1')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'uhpab_results/ABC_1')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'uhpab_results/ABC_1')));
+    for (const uid of ['principal1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(setDoc(doc(as(uid), 'uhpab_results/ABC_1'), results(uid)));
+    }
+  });
+
+  it('students, tutors and the bursar cannot read results, or get round the Worker', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'uhpab_results/ABC_1'), results('registrar1')));
+    for (const db of [anon(), as('tutor1'), as('bursar1')]) {
+      await assertFails(getDoc(doc(db, 'uhpab_results/ABC_1')));
+    }
+  });
+
+  it('only the bursar allows viewing', async () => {
+    await assertSucceeds(setDoc(doc(as('bursar1'), 'result_clearance/ABC_1'), clearance('bursar1')));
+    await assertSucceeds(setDoc(doc(as('bursar1'), 'result_clearance/ABC_1'), clearance('bursar1', false)));
+    await assertSucceeds(getDocs(collection(as('bursar1'), 'result_clearance')));
+    await assertSucceeds(getDoc(doc(as('registrar1'), 'result_clearance/ABC_1')));
+    for (const uid of ['registrar1', 'principal1', 'deputy1', 'tutor1']) {
+      await assertFails(setDoc(doc(as(uid), 'result_clearance/ABC_1'), clearance(uid)));
+    }
+    await assertFails(setDoc(doc(anon(), 'result_clearance/ABC_1'), clearance('x')));
+    await assertFails(getDoc(doc(anon(), 'result_clearance/ABC_1')));
+    await assertFails(deleteDoc(doc(as('bursar1'), 'result_clearance/ABC_1')));
+  });
+});
