@@ -6,6 +6,10 @@ const _left = 50;
 const _bottom = 60;
 const _top = 800;
 
+/// The badge's side on the page, and where the text beside it starts.
+const _logoSide = 80;
+const _besideLogo = _left + _logoSide + 12;
+
 /// Table columns: where each starts and how many characters fit at size 10.
 const _columns = [(50, 48), (330, 9), (400, 7), (455, 5), (500, 7)];
 const _headings = ['Course unit', 'Course /40', 'UHPAB', 'Grade', 'Points'];
@@ -25,8 +29,29 @@ List<String> wrapText(String value, int width) {
   return lines;
 }
 
-/// An A4 result slip or transcript, over as many pages as it needs.
-Uint8List resultPdf(ResultDocument document) {
+/// The width and height in pixels of a JPEG, or null if [bytes] is not one.
+(int, int)? jpegSize(Uint8List bytes) {
+  if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) return null;
+  var i = 2;
+  // Each segment is FF, its kind, then its length. The frame header (C0 to
+  // C2) holds the size.
+  while (i + 9 <= bytes.length && bytes[i] == 0xFF) {
+    final kind = bytes[i + 1];
+    if (kind >= 0xC0 && kind <= 0xC2) {
+      return (
+        bytes[i + 7] << 8 | bytes[i + 8],
+        bytes[i + 5] << 8 | bytes[i + 6],
+      );
+    }
+    i += 2 + (bytes[i + 2] << 8 | bytes[i + 3]);
+  }
+  return null;
+}
+
+/// An A4 result slip or transcript, over as many pages as it needs. [logo] is
+/// a colour JPEG shown at the top of the first page.
+Uint8List resultPdf(ResultDocument document, {Uint8List? logo}) {
+  final size = logo == null ? null : jpegSize(logo);
   final pages = <StringBuffer>[StringBuffer()];
   var y = _top;
 
@@ -49,11 +74,11 @@ Uint8List resultPdf(ResultDocument document) {
     pages.last.writeln('0.5 w $_left ${y + 4} m 545 ${y + 4} l S');
   }
 
-  void text(String value, {int size = 10, bool bold = false}) {
+  void text(String value, {int size = 10, bool bold = false, int x = _left}) {
     // Helvetica averages a little over half its size per character.
-    for (final line in wrapText(value, 900 ~/ size)) {
+    for (final line in wrapText(value, (545 - x) * 20 ~/ (11 * size))) {
       need(size + 5);
-      put(line, _left, size, bold);
+      put(line, x, size, bold);
       y -= size + 5;
     }
   }
@@ -78,10 +103,18 @@ Uint8List resultPdf(ResultDocument document) {
   }
 
   final wording = document.wording;
-  text(wording['schoolName'] ?? '', size: 18, bold: true);
-  for (final key in ['address', 'contact', 'accreditation']) {
-    text(wording[key] ?? '');
+  final headingX = size == null ? _left : _besideLogo;
+  if (size != null) {
+    pages.last.writeln('q $_logoSide 0 0 $_logoSide $_left '
+        '${_top + 14 - _logoSide} cm /Logo Do Q');
   }
+  text(wording['schoolName'] ?? '', size: 18, bold: true, x: headingX);
+  text(wording['motto'] ?? '', bold: true, x: headingX);
+  for (final key in ['address', 'contact', 'accreditation']) {
+    text(wording[key] ?? '', x: headingX);
+  }
+  // The line under the heading must clear the badge.
+  if (size != null && y > _top - _logoSide) y = _top - _logoSide;
   y -= 10;
   rule();
   y -= 14;
@@ -130,13 +163,20 @@ Uint8List resultPdf(ResultDocument document) {
     pages[i].writeln('BT /F1 8 Tf 500 $y Td '
         '(Page ${i + 1} of ${pages.length}) Tj ET');
   }
-  return _assemble([for (final page in pages) page.toString()]);
+  return _assemble(
+    [for (final page in pages) page.toString()],
+    size == null ? null : (logo!, size),
+  );
 }
 
-Uint8List _assemble(List<String> pages) {
+Uint8List _assemble(List<String> pages, (Uint8List, (int, int))? logo) {
   const font = '<< /Type /Font /Subtype /Type1 /Encoding /WinAnsiEncoding '
       '/BaseFont /Helvetica';
-  // Objects 1 to 4 are fixed; then a page and its contents for each page.
+  // Objects 1 to 4 are fixed; then a page and its contents for each page,
+  // and last the logo.
+  final images = logo == null
+      ? ''
+      : ' /XObject << /Logo ${5 + pages.length * 2} 0 R >>';
   final kids = [
     for (var i = 0; i < pages.length; i++) '${5 + i * 2} 0 R',
   ].join(' ');
@@ -147,10 +187,16 @@ Uint8List _assemble(List<String> pages) {
     '$font-Bold >>',
     for (var i = 0; i < pages.length; i++) ...[
       '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] '
-          '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> '
+          '/Resources << /Font << /F1 3 0 R /F2 4 0 R >>$images >> '
           '/Contents ${6 + i * 2} 0 R >>',
       '<< /Length ${pages[i].length} >>\nstream\n${pages[i]}endstream',
     ],
+    if (logo case (final bytes, (final width, final height)))
+      '<< /Type /XObject /Subtype /Image /Width $width /Height $height '
+          '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode '
+          '/Length ${bytes.length} >>\n'
+          // One character for each byte, as latin1 writes them back.
+          'stream\n${latin1.decode(bytes)}\nendstream',
   ];
   // Every character is one byte, so string lengths are byte offsets.
   final pdf = StringBuffer('%PDF-1.4\n');

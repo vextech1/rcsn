@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rcsn_mobile_app/core/constants/academic_structure.dart';
 import 'package:rcsn_mobile_app/core/utils/result_pdf.dart';
@@ -103,6 +104,24 @@ void main() {
       pdf.split('startxref\n').last.split('\n').first,
     );
     expect(pdf.substring(start), startsWith('xref'));
+  });
+
+  test('the school badge is placed on the first page', () {
+    final logo = File('assets/images/school_logo.jpg').readAsBytesSync();
+    expect(jpegSize(logo), (360, 360));
+    final pdf = latin1.decode(resultPdf(build(), logo: logo));
+    expect(pdf, contains('/Width 360 /Height 360'));
+    expect(pdf, contains('/Logo Do'));
+    expect(pdf, contains('We serve for better health'));
+    // The image is carried byte for byte.
+    expect(pdf, contains(latin1.decode(logo)));
+  });
+
+  test('a file that is not a JPEG is left out', () {
+    final bytes = latin1.encode('not a picture');
+    expect(jpegSize(bytes), isNull);
+    final pdf = latin1.decode(resultPdf(build(), logo: bytes));
+    expect(pdf, isNot(contains('/Logo')));
   });
 
   test('long text wraps without losing words', () {

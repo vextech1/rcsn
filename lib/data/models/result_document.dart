@@ -13,6 +13,7 @@ class DocumentTemplate {
   /// Field keys and what each is called, in the order shown.
   static const Map<String, String> labels = {
     'schoolName': 'School name',
+    'motto': 'Motto',
     'address': 'Address',
     'contact': 'Telephone, email and website',
     'accreditation': 'Accreditation',
@@ -26,9 +27,12 @@ class DocumentTemplate {
   /// The limit on each field. The rules check the same.
   static const int maxLength = 200;
 
-  /// Name, town, website and accreditation as published on www.rcsn.ac.ug.
+  /// Name, town, website and accreditation as published on www.rcsn.ac.ug;
+  /// the motto from the school badge.
   static const DocumentTemplate defaults = DocumentTemplate({
     'schoolName': 'Rakai Community School of Nursing',
+    // As on the school badge.
+    'motto': 'We serve for better health',
     'address': 'Rakai Town Council, Rakai, Uganda',
     'contact': 'www.rcsn.ac.ug',
     'accreditation': 'Accredited by MoES (ME/VOC/071) and UNMC. '

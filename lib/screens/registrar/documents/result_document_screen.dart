@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/utils/result_pdf.dart';
@@ -127,10 +128,15 @@ class _ResultDocumentScreenState extends State<ResultDocumentScreen> {
     final kind = _only == null
         ? 'transcript'
         : 'results_Y${_only!.$1}S${_only!.$2}';
+    final logo = await rootBundle.load('assets/images/school_logo.jpg');
+    if (!mounted) return;
     await saveToPhone(
       context,
       '${kind}_${StudentNumber.bioKey(widget.student.nsin)}.pdf',
-      resultPdf(_document!),
+      resultPdf(
+        _document!,
+        logo: logo.buffer.asUint8List(logo.offsetInBytes, logo.lengthInBytes),
+      ),
     );
   }
 

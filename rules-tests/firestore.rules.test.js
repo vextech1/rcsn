@@ -1186,7 +1186,7 @@ describe('attendance', () => {
 
 describe('result slip and transcript template', () => {
   const template = (uid, extra = {}) => ({
-    schoolName: 'RCSN', address: '', contact: '', accreditation: '', slipTitle: 'Slip',
+    schoolName: 'RCSN', motto: '', address: '', contact: '', accreditation: '', slipTitle: 'Slip',
     transcriptTitle: 'Transcript', signatory1: 'Registrar', signatory2: 'Principal', footer: '',
     updatedBy: uid, updatedAt: serverTimestamp(), ...extra,
   });

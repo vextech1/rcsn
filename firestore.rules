@@ -975,10 +975,11 @@ service cloud.firestore {
       allow get: if isRegistrar() || isPrincipalLevel();
       allow create, update: if isRegistrar()
         && request.resource.data.keys().hasOnly(
-             ['schoolName', 'address', 'contact', 'accreditation',
+             ['schoolName', 'motto', 'address', 'contact', 'accreditation',
               'slipTitle', 'transcriptTitle', 'signatory1', 'signatory2',
               'footer', 'updatedBy', 'updatedAt'])
         && isLine(request.resource.data.schoolName)
+        && isLine(request.resource.data.motto)
         && isLine(request.resource.data.address)
         && isLine(request.resource.data.contact)
         && isLine(request.resource.data.accreditation)
