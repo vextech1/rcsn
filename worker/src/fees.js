@@ -31,7 +31,7 @@ const encode = (bytes) =>
 const encodeJson = (o) => encode(new TextEncoder().encode(JSON.stringify(o)));
 
 async function serviceToken(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT) throw new HttpError(503, 'Fee lookup is not set up yet.');
+  if (!env.FIREBASE_SERVICE_ACCOUNT) throw new HttpError(503, 'This service is not set up yet.');
   const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
   if (cached.email === account.client_email && Date.now() < cached.expires) return cached.token;
 
@@ -56,7 +56,7 @@ async function serviceToken(env) {
       assertion: `${body}.${encode(signature)}`,
     }),
   });
-  if (!res.ok) throw new HttpError(503, 'Fee lookup is unavailable. Try again.');
+  if (!res.ok) throw new HttpError(503, 'This service is unavailable. Try again.');
   const data = await res.json();
   cached = {
     token: data.access_token,
@@ -70,6 +70,9 @@ async function serviceToken(env) {
 
 function plain(value) {
   if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return value.doubleValue;
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('mapValue' in value) return fields(value.mapValue);
   if ('arrayValue' in value) return (value.arrayValue.values || []).map(plain);
   return value.stringValue ?? value.timestampValue ?? null;
 }
@@ -85,16 +88,16 @@ async function firestore(env, path, init = {}) {
     },
   });
   if (res.status === 404) return null;
-  if (!res.ok) throw new HttpError(503, 'Fee lookup is unavailable. Try again.');
+  if (!res.ok) throw new HttpError(503, 'This service is unavailable. Try again.');
   return res.json();
 }
 
-async function read(env, path) {
+export async function read(env, path) {
   const doc = await firestore(env, `/${path}`);
   return doc ? fields(doc) : null;
 }
 
-async function query(env, parent, structuredQuery) {
+export async function query(env, parent, structuredQuery) {
   const rows = await firestore(env, `${parent}:runQuery`, {
     method: 'POST', body: JSON.stringify({ structuredQuery }),
   });

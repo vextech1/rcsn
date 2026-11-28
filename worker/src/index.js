@@ -4,6 +4,7 @@
 //   GET    /files/subjects/{subjectId}/content/{fileName}   download
 //   DELETE /files/subjects/{subjectId}/content/{fileName}   delete
 //   PUT, GET, DELETE /files/public/{uid}/{postId}/{fileName}  public post files
+//   /uhpab and /files/uhpab/...  UHPAB results (see uhpab.js)
 //
 // Callers prove who they are with either
 //   Authorization: Bearer <Firebase ID token>   (staff and tutors), or
@@ -31,6 +32,7 @@ const CONTENT_TYPES = {
 import { HttpError, firestoreBase } from './common.js';
 import { fees } from './fees.js';
 import { publicFile } from './public.js';
+import { uhpabFile, uhpabResults } from './uhpab.js';
 
 const JWKS_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -254,6 +256,14 @@ async function handle(request, env) {
   if (pathname === '/fees') {
     if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
     return fees(request, env);
+  }
+  if (pathname === '/uhpab') {
+    if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
+    return uhpabResults(request, env, { findStudent });
+  }
+  if (pathname.startsWith('/files/uhpab/')) {
+    return uhpabFile(request, env, pathname,
+      { verifyIdToken, getDocument, findStudent, upload, download, remove });
   }
   if (pathname.startsWith('/files/public/')) {
     return publicFile(request, env, pathname, { verifyIdToken, getDocument, upload, download, remove });

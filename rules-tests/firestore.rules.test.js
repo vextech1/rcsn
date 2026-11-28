@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 const {
   initializeTestEnvironment,
   assertSucceeds,
@@ -24,6 +25,7 @@ const {
   query,
   where,
   Timestamp,
+  deleteField,
 } = require('firebase/firestore');
 
 let env;
@@ -949,5 +951,109 @@ describe('content type rename and delete', () => {
       await setDoc(doc(ctx.firestore(), 'content_types/ct2'), { name: 'Other' });
     });
     await assertSucceeds(deleteDoc(doc(as('registrar1'), 'content_types/ct2')));
+  });
+});
+
+describe('coursework and published results', () => {
+  const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const marks = { practical: 8, assignments: 4, tests: 4.5, clinical: 7, recordBook: 6 };
+  const draft = (uid, extra = {}) => ({
+    nsin: 'ABC/1', subjectId: 's1', subjectName: 'CN 111 Anatomy', programType: 'certificateNursing',
+    year: 1, semester: 1, marks, published: false, pendingChanges: false, ...stamp(uid), ...extra,
+  });
+  const result = (uid, subjects) => ({ nsin: 'ABC/1', subjects, ...stamp(uid) });
+  // What the app does: replace one course unit and keep the others.
+  const setUnit = (db, id, value) =>
+    setDoc(doc(db, 'student_results/ABC_1'), result('registrar1', { [id]: value }), {
+      mergeFields: ['nsin', `subjects.${id}`, 'updatedBy', 'updatedAt'],
+    });
+
+  it('the registrar saves drafts, complete or not', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'coursework/s1_ABC_1'), draft('registrar1')));
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'coursework/s1_ABC_1'), draft('registrar1', { marks: { tests: 3 } })));
+    await assertSucceeds(getDocs(query(collection(as('registrar1'), 'coursework'), where('subjectId', '==', 's1'))));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'coursework/s1_ABC_1')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'coursework/s1_ABC_1')));
+  });
+
+  it('marks outside their weight are rejected', async () => {
+    for (const bad of [{ tests: 6 }, { practical: 11 }, { clinical: -1 }, { recordBook: '5' }, { exam: 3 }]) {
+      await assertFails(setDoc(doc(as('registrar1'), 'coursework/s1_ABC_1'), draft('registrar1', { marks: bad })));
+    }
+  });
+
+  it('only the registrar writes coursework and results', async () => {
+    for (const uid of ['principal1', 'deputy1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(setDoc(doc(as(uid), 'coursework/s1_ABC_1'), draft(uid)));
+      await assertFails(setDoc(doc(as(uid), 'student_results/ABC_1'), result(uid, {})));
+    }
+    await assertFails(setDoc(doc(anon(), 'student_results/ABC_1'), result('x', {})));
+  });
+
+  it('drafts are hidden from students, tutors and the bursar', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'coursework/s1_ABC_1'), draft('registrar1')));
+    await assertFails(getDoc(doc(anon(), 'coursework/s1_ABC_1')));
+    await assertFails(getDoc(doc(as('tutor1'), 'coursework/s1_ABC_1')));
+    await assertFails(getDoc(doc(as('bursar1'), 'coursework/s1_ABC_1')));
+    await assertFails(getDocs(query(collection(anon(), 'coursework'), where('nsin', '==', 'ABC/1'))));
+  });
+
+  it('a student opens their own results but nobody lists them', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'student_results/NOTHING_YET')));
+    await assertSucceeds(setUnit(as('registrar1'), 's1', { marks }));
+    await assertSucceeds(getDoc(doc(anon(), 'student_results/ABC_1')));
+    await assertFails(getDocs(collection(anon(), 'student_results')));
+    await assertFails(getDocs(collection(as('registrar1'), 'student_results')));
+  });
+
+  it('publishing and recalling one unit leaves the others', async () => {
+    const db = as('registrar1');
+    await assertSucceeds(setUnit(db, 's1', { marks }));
+    await assertSucceeds(setUnit(db, 's2', { marks }));
+    await assertSucceeds(setUnit(db, 's1', deleteField()));
+    const saved = (await getDoc(doc(anon(), 'student_results/ABC_1'))).data();
+    assert.deepStrictEqual(Object.keys(saved.subjects), ['s2']);
+  });
+
+  it('nothing can be deleted', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'coursework/s1_ABC_1'), draft('registrar1')));
+    await assertSucceeds(setUnit(as('registrar1'), 's1', { marks }));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'coursework/s1_ABC_1')));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'student_results/ABC_1')));
+  });
+});
+
+describe('UHPAB results and the Bursar\'s permission', () => {
+  const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const results = (uid) => ({ nsin: 'ABC/1', units: {}, documents: {}, ...stamp(uid) });
+  const clearance = (uid, allowed = true) => ({ nsin: 'ABC/1', allowed, ...stamp(uid) });
+
+  it('the registrar writes results; principal level reads them', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'uhpab_results/ABC_1'), results('registrar1')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'uhpab_results/ABC_1')));
+    await assertSucceeds(getDoc(doc(as('deputy1'), 'uhpab_results/ABC_1')));
+    for (const uid of ['principal1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(setDoc(doc(as(uid), 'uhpab_results/ABC_1'), results(uid)));
+    }
+  });
+
+  it('students, tutors and the bursar cannot read results, or get round the Worker', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), 'uhpab_results/ABC_1'), results('registrar1')));
+    for (const db of [anon(), as('tutor1'), as('bursar1')]) {
+      await assertFails(getDoc(doc(db, 'uhpab_results/ABC_1')));
+    }
+  });
+
+  it('only the bursar allows viewing', async () => {
+    await assertSucceeds(setDoc(doc(as('bursar1'), 'result_clearance/ABC_1'), clearance('bursar1')));
+    await assertSucceeds(setDoc(doc(as('bursar1'), 'result_clearance/ABC_1'), clearance('bursar1', false)));
+    await assertSucceeds(getDocs(collection(as('bursar1'), 'result_clearance')));
+    await assertSucceeds(getDoc(doc(as('registrar1'), 'result_clearance/ABC_1')));
+    for (const uid of ['registrar1', 'principal1', 'deputy1', 'tutor1']) {
+      await assertFails(setDoc(doc(as(uid), 'result_clearance/ABC_1'), clearance(uid)));
+    }
+    await assertFails(setDoc(doc(anon(), 'result_clearance/ABC_1'), clearance('x')));
+    await assertFails(getDoc(doc(anon(), 'result_clearance/ABC_1')));
+    await assertFails(deleteDoc(doc(as('bursar1'), 'result_clearance/ABC_1')));
   });
 });

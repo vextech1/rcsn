@@ -27,6 +27,11 @@ import '../../screens/principal/staff/principal_staff_screen.dart';
 import '../../screens/registrar/dashboard/registrar_dashboard_screen.dart';
 import '../../screens/registrar/bio/student_bio_screen.dart';
 import '../../screens/admin/students/student_detail_screen.dart';
+import '../../screens/registrar/coursework/coursework_screen.dart';
+import '../../screens/student/results/student_results_screen.dart';
+import '../../screens/student/results/student_uhpab_screen.dart';
+import '../../screens/registrar/uhpab/uhpab_screen.dart';
+import '../../screens/bursar/results/result_access_screen.dart';
 import '../../data/models/student_record.dart';
 import '../../screens/registrar/student_number/student_number_format_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
@@ -201,6 +206,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarStructure, builder: (_, __) => const AdminStructureScreen()),
       GoRoute(path: AppRoutes.registrarTutors, builder: (_, __) => const AdminTutorsScreen()),
       GoRoute(path: AppRoutes.registrarStudents, builder: (_, __) => const AdminStudentsScreen()),
+      GoRoute(path: AppRoutes.registrarCoursework, builder: (_, __) => const CourseworkScreen()),
       GoRoute(path: AppRoutes.registrarContentTypes, builder: (_, __) => const AdminContentTypesScreen()),
 
       GoRoute(
@@ -209,6 +215,15 @@ GoRouter buildAppRouter({
           final extra = state.extra;
           return extra is StudentRecord
               ? StudentDetailScreen(student: extra)
+              : const AdminStudentsScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.registrarUhpab,
+        builder: (_, state) {
+          final extra = state.extra;
+          return extra is StudentRecord
+              ? UhpabScreen(student: extra)
               : const AdminStudentsScreen();
         },
       ),
@@ -225,6 +240,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.registrarStudentNumber, builder: (_, __) => const StudentNumberFormatScreen()),
 
       // Bursar
+      GoRoute(path: AppRoutes.bursarResultAccess, builder: (_, __) => const ResultAccessScreen()),
       GoRoute(path: AppRoutes.bursarBulk, builder: (_, __) => const BursarBulkTuitionScreen()),
       GoRoute(path: AppRoutes.bursarDashboard, builder: (_, __) => const BursarDashboardScreen()),
       GoRoute(
@@ -265,6 +281,8 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.studentSubject, builder: (_, __) => const StudentSubjectScreen()),
       GoRoute(path: AppRoutes.feeLookup, builder: (_, __) => const StudentFeesScreen(lookup: true)),
       GoRoute(path: AppRoutes.studentFees, builder: (_, __) => const StudentFeesScreen()),
+      GoRoute(path: AppRoutes.studentResults, builder: (_, __) => const StudentResultsScreen()),
+      GoRoute(path: AppRoutes.studentUhpab, builder: (_, __) => const StudentUhpabScreen()),
       GoRoute(path: AppRoutes.studentSettings, builder: (_, __) => const StudentSettingsScreen()),
       GoRoute(path: AppRoutes.studentAccountInactive, builder: (_, __) => const StudentAccountInactiveScreen()),
     ],

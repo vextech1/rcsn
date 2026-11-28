@@ -7,15 +7,18 @@ import '../../../core/constants/user_role.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/utils/student_number.dart';
+import '../../../data/models/coursework.dart';
 import '../../../data/models/student_record.dart';
 import '../../../data/models/subject.dart';
 import '../../../data/models/timetable.dart';
+import '../../../data/repositories/coursework_repository.dart';
 import '../../../data/repositories/fee_repository.dart';
 import '../../../data/repositories/structure_repository.dart';
 import '../../../data/repositories/student_bio_repository.dart';
 import '../../../data/repositories/timetable_repository.dart';
 import '../../../data/repositories/tutor_repository.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../widgets/coursework/coursework_list.dart';
 
 /// Everything on record about one student, read-only.
 ///
@@ -35,6 +38,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   late Future<Map<String, String>> _bio = _loadBio();
   late final _subjects = _loadSubjects();
   late final _timetables = _loadTimetables();
+  late final _coursework = CourseworkRepository().forStudent(_student.nsin);
   late final _fees =
       _showFees ? FeeRepository().recordsForStudent(_student.nsin) : null;
 
@@ -178,6 +182,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   ),
                 ),
             ],
+          ),
+          _heading('Coursework'),
+          _section<List<CourseworkEntry>>(
+            _coursework,
+            (entries) => [
+              if (entries.isEmpty)
+                const Text('No coursework recorded.')
+              else
+                CourseworkList(entries: entries, showStatus: true),
+            ],
+          ),
+          _heading('UHPAB results'),
+          OutlinedButton.icon(
+            onPressed: () => context.push(
+              AppRoutes.registrarUhpab,
+              extra: _student,
+            ),
+            icon: const Icon(Icons.workspace_premium),
+            label: const Text('Open UHPAB results'),
           ),
           _heading('Timetables'),
           _section<List<Timetable>>(

@@ -106,6 +106,11 @@ class StructureNotFoundFailure extends AppFailure {
         );
 }
 
+/// Coursework could not be loaded or saved.
+class CourseworkFailure extends AppFailure {
+  const CourseworkFailure(super.message);
+}
+
 /// A fee record could not be saved.
 class FeeFailure extends AppFailure {
   const FeeFailure(super.message);

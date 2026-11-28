@@ -338,6 +338,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                 onSelected: (choice) {
                   if (choice is AccountStatus) {
                     _changeStatus(student, choice);
+                  } else if (choice == 'uhpab') {
+                    context.push(AppRoutes.registrarUhpab, extra: student);
                   } else {
                     _openBio(
                       StudentNumber.bioKey(student.nsin),
@@ -347,6 +349,10 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                 },
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'bio', child: Text('Bio data')),
+                  const PopupMenuItem(
+                    value: 'uhpab',
+                    child: Text('UHPAB results'),
+                  ),
                   if (student.status != AccountStatus.active)
                     const PopupMenuItem(
                       value: AccountStatus.active,
