@@ -338,6 +338,11 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                 onSelected: (choice) {
                   if (choice is AccountStatus) {
                     _changeStatus(student, choice);
+                  } else if (choice == 'discipline') {
+                    context.push(
+                      AppRoutes.registrarDiscipline,
+                      extra: student,
+                    );
                   } else if (choice == 'uhpab') {
                     context.push(AppRoutes.registrarUhpab, extra: student);
                   } else {
@@ -352,6 +357,10 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   const PopupMenuItem(
                     value: 'uhpab',
                     child: Text('UHPAB results'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'discipline',
+                    child: Text('Disciplinary cases'),
                   ),
                   if (student.status != AccountStatus.active)
                     const PopupMenuItem(

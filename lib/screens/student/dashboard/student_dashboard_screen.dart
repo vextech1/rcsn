@@ -18,6 +18,7 @@ import '../../../providers/student_provider.dart';
 import '../../../widgets/common/app_empty_state.dart';
 import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/common/app_loading_indicator.dart';
+import '../../../widgets/discipline/discipline_tile.dart';
 
 /// The student's landing screen after a successful NSIN lookup.
 ///
@@ -149,45 +150,49 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _StudentInfoCard(student: student),
+      // The whole page scrolls: the menu leaves too little room for a
+      // separately scrolling subject list on a small phone.
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StudentInfoCard(student: student),
 
-          ListTile(
-            leading: const Icon(Icons.grading, color: AppColors.primary),
-            title: const Text('My coursework results'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.studentResults),
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.workspace_premium,
-                color: AppColors.primary),
-            title: const Text('My UHPAB results'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.studentUhpab),
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.payments, color: AppColors.primary),
-            title: const Text('My fees'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.studentFees),
-          ),
-
-          const Divider(height: 1),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              'Your Subjects',
-              style: AppTypography.heading3(context),
+            ListTile(
+              leading: const Icon(Icons.grading, color: AppColors.primary),
+              title: const Text('My coursework results'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.studentResults),
             ),
-          ),
 
-          Expanded(
-            child: StreamBuilder<List<Subject>>(
+            ListTile(
+              leading: const Icon(Icons.workspace_premium,
+                  color: AppColors.primary),
+              title: const Text('My UHPAB results'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.studentUhpab),
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.payments, color: AppColors.primary),
+              title: const Text('My fees'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.studentFees),
+            ),
+
+            DisciplineTile(key: ValueKey(student.nsin), nsin: student.nsin),
+
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Your Subjects',
+                style: AppTypography.heading3(context),
+              ),
+            ),
+
+            StreamBuilder<List<Subject>>(
               stream: StructureRepository()
                   .watchSubjectsForTrack(student.programType),
               builder: (context, snapshot) {
@@ -222,6 +227,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 }
 
                 return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: subjects.length,
                   separatorBuilder: (_, __) =>
@@ -239,8 +246,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

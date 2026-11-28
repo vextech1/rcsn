@@ -202,6 +202,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             icon: const Icon(Icons.workspace_premium),
             label: const Text('Open UHPAB results'),
           ),
+          _heading('Discipline'),
+          OutlinedButton.icon(
+            onPressed: () => context.push(
+              AppRoutes.registrarDiscipline,
+              extra: _student,
+            ),
+            icon: const Icon(Icons.gavel),
+            label: const Text('Open disciplinary cases'),
+          ),
           _heading('Timetables'),
           _section<List<Timetable>>(
             _timetables,
