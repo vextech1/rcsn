@@ -1183,3 +1183,37 @@ describe('attendance', () => {
     await assertFails(deleteDoc(doc(as('registrar1'), 'student_attendance/ABC_1')));
   });
 });
+
+describe('result slip and transcript template', () => {
+  const template = (uid, extra = {}) => ({
+    schoolName: 'RCSN', address: '', contact: '', accreditation: '', slipTitle: 'Slip',
+    transcriptTitle: 'Transcript', signatory1: 'Registrar', signatory2: 'Principal', footer: '',
+    updatedBy: uid, updatedAt: serverTimestamp(), ...extra,
+  });
+  const path = 'settings/documents';
+
+  it('the registrar edits it and the principal level reads it', async () => {
+    await assertSucceeds(setDoc(doc(as('registrar1'), path), template('registrar1')));
+    await assertSucceeds(getDoc(doc(as('principal1'), path)));
+    await assertSucceeds(getDoc(doc(as('deputy1'), path)));
+  });
+
+  it('nobody else edits it, and strangers do not read it', async () => {
+    for (const uid of ['principal1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(setDoc(doc(as(uid), path), template(uid)));
+    }
+    await assertFails(getDoc(doc(anon(), path)));
+    await assertFails(getDoc(doc(as('tutor1'), path)));
+  });
+
+  it('rejects long, missing or extra fields and deletion', async () => {
+    const write = (data) => setDoc(doc(as('registrar1'), path), data);
+    await assertFails(write(template('registrar1', { footer: 'x'.repeat(201) })));
+    await assertFails(write(template('registrar1', { address: 5 })));
+    await assertFails(write(template('registrar1', { logo: 'x' })));
+    const { footer, ...missing } = template('registrar1');
+    await assertFails(write(missing));
+    await assertSucceeds(write(template('registrar1')));
+    await assertFails(deleteDoc(doc(as('registrar1'), path)));
+  });
+});

@@ -87,6 +87,7 @@ class AppRoutes {
   static const String studentPlacements = '/student/placements';
   static const String studentAttendance = '/student/attendance';
   static const String registrarAttendance = '/registrar/attendance';
+  static const String registrarDocuments = '/registrar/students/documents';
   static const String registrarPlacements = '/registrar/students/placements';
   static const String registrarDiscipline = '/registrar/students/discipline';
   static const String registrarUhpab = '/registrar/students/uhpab';

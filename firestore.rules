@@ -44,6 +44,11 @@ service cloud.firestore {
         && isMark(marks, 'recordBook', 10);
     }
 
+    /// A short line of text, which may be blank.
+    function isLine(value) {
+      return value is string && value.size() <= 200;
+    }
+
     function isPrincipal()      { return isStaffRole('principal'); }
     function isDeputy()         { return isStaffRole('deputyPrincipal'); }
     /// The Deputy Principal has the Principal's day-to-day powers; the places
@@ -961,6 +966,27 @@ service cloud.firestore {
              ['nsin', 'units', 'updatedBy', 'updatedAt'])
         && request.resource.data.nsin is string
         && request.resource.data.get('units', {}) is map
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
+    // The wording on result slips and transcripts.
+    match /settings/documents {
+      allow get: if isRegistrar() || isPrincipalLevel();
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['schoolName', 'address', 'contact', 'accreditation',
+              'slipTitle', 'transcriptTitle', 'signatory1', 'signatory2',
+              'footer', 'updatedBy', 'updatedAt'])
+        && isLine(request.resource.data.schoolName)
+        && isLine(request.resource.data.address)
+        && isLine(request.resource.data.contact)
+        && isLine(request.resource.data.accreditation)
+        && isLine(request.resource.data.slipTitle)
+        && isLine(request.resource.data.transcriptTitle)
+        && isLine(request.resource.data.signatory1)
+        && isLine(request.resource.data.signatory2)
+        && isLine(request.resource.data.footer)
         && isFeeStamp();
       allow delete: if false;
     }

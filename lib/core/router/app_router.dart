@@ -38,6 +38,7 @@ import '../../screens/registrar/placements/placements_screen.dart';
 import '../../screens/student/placements/student_placements_screen.dart';
 import '../../screens/registrar/attendance/attendance_screen.dart';
 import '../../screens/student/attendance/student_attendance_screen.dart';
+import '../../screens/registrar/documents/result_document_screen.dart';
 import '../../data/models/student_record.dart';
 import '../../screens/registrar/student_number/student_number_format_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
@@ -249,6 +250,15 @@ GoRouter buildAppRouter({
           final extra = state.extra;
           return extra is StudentRecord
               ? PlacementsScreen(student: extra)
+              : const AdminStudentsScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.registrarDocuments,
+        builder: (_, state) {
+          final extra = state.extra;
+          return extra is StudentRecord
+              ? ResultDocumentScreen(student: extra)
               : const AdminStudentsScreen();
         },
       ),

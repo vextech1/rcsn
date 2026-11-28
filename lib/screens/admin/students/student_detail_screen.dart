@@ -197,6 +197,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 CourseworkList(entries: entries, showStatus: true),
             ],
           ),
+          // The Registrar issues documents; the rules let only the
+          // Registrar change the template.
+          if (context.read<AuthProvider>().resolvedRole ==
+              UserRole.registrar) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => context.push(
+                AppRoutes.registrarDocuments,
+                extra: _student,
+              ),
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('Result slip or transcript'),
+            ),
+          ],
           _heading('Attendance'),
           _section<List<Attendance>>(
             _attendance,
