@@ -27,6 +27,23 @@ service cloud.firestore {
              .data.role == role;
     }
 
+    /// The five coursework marks, each within its weight. Any may be missing
+    /// while a draft is unfinished.
+    function isMark(marks, part, max) {
+      return !(part in marks)
+        || (marks[part] is number && marks[part] >= 0 && marks[part] <= max);
+    }
+    function isCourseworkMarks(marks) {
+      return marks is map
+        && marks.keys().hasOnly(
+             ['practical', 'assignments', 'tests', 'clinical', 'recordBook'])
+        && isMark(marks, 'practical', 10)
+        && isMark(marks, 'assignments', 5)
+        && isMark(marks, 'tests', 5)
+        && isMark(marks, 'clinical', 10)
+        && isMark(marks, 'recordBook', 10);
+    }
+
     function isPrincipal()      { return isStaffRole('principal'); }
     function isDeputy()         { return isStaffRole('deputyPrincipal'); }
     /// The Deputy Principal has the Principal's day-to-day powers; the places
@@ -824,6 +841,36 @@ service cloud.firestore {
              ['dateOfBirth', 'district', 'village', 'primarySchool',
               'secondarySchool', 'updatedBy', 'updatedAt'])
         && request.resource.data.dateOfBirth.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
+    // Coursework as the Registrar holds it, drafts included. Never readable
+    // by students: published marks are copied to student_results.
+    match /coursework/{id} {
+      allow read: if isRegistrar() || isPrincipalLevel();
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'subjectId', 'subjectName', 'programType', 'year',
+              'semester', 'marks', 'published', 'pendingChanges',
+              'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.subjectId is string
+        && request.resource.data.published is bool
+        && isCourseworkMarks(request.resource.data.marks)
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
+    // Published results, one document per student. Students do not sign in,
+    // so whoever knows the student number can open one; nobody can list them.
+    match /student_results/{key} {
+      allow get: if true;
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'subjects', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.get('subjects', {}) is map
         && isFeeStamp();
       allow delete: if false;
     }

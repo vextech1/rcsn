@@ -155,6 +155,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           _StudentInfoCard(student: student),
 
           ListTile(
+            leading: const Icon(Icons.grading, color: AppColors.primary),
+            title: const Text('My coursework results'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.studentResults),
+          ),
+
+          ListTile(
             leading: const Icon(Icons.payments, color: AppColors.primary),
             title: const Text('My fees'),
             trailing: const Icon(Icons.chevron_right),

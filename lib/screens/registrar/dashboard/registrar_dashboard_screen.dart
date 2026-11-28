@@ -56,6 +56,14 @@ class RegistrarDashboardScreen extends StatelessWidget {
               label: 'Students',
               onTap: () => context.push(AppRoutes.registrarStudents),
             ),
+            // Only the Registrar enters marks; the rules agree.
+            if (context.watch<AuthProvider>().resolvedRole ==
+                UserRole.registrar)
+              DashboardTile(
+                icon: Icons.grading,
+                label: 'Coursework',
+                onTap: () => context.push(AppRoutes.registrarCoursework),
+              ),
             // Only the Registrar may change it; the rules agree.
             if (context.watch<AuthProvider>().resolvedRole ==
                 UserRole.registrar)

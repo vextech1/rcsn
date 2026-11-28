@@ -55,6 +55,7 @@ class AppRoutes {
   static const String registrarContentTypes = '/registrar/content-types';
   static const String registrarStudentBio = '/registrar/students/bio';
   static const String registrarStudentDetail = '/registrar/students/detail';
+  static const String registrarCoursework = '/registrar/coursework';
   static const String registrarStudentNumber = '/registrar/student-number';
 
   // Bursar
@@ -80,6 +81,7 @@ class AppRoutes {
   // Outside /student: parents need only the NSIN or the payment code.
   static const String feeLookup = '/fee-lookup';
   static const String studentFees = '/student/fees';
+  static const String studentResults = '/student/results';
   static const String studentSettings = '/student/settings';
   static const String studentAccountInactive = '/student/account-inactive';
 }
