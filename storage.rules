@@ -1,15 +1,12 @@
 rules_version = '2';
 
+// Firebase Storage is not used by the app: files are stored through the
+// storage Worker (docs/STORAGE.md). Deny everything so a signed-in account,
+// including one anyone can self-register, cannot read, write or delete here.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Tutor uploads live under subjects/{subjectId}/content/. Any signed-in
-    // user may read; writes are capped at 100MB (matches UploadRules in the
-    // app). Tighten to assigned tutors in a later phase (see docs/PLAN.md).
-    match /subjects/{subjectId}/content/{file=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.size < 100 * 1024 * 1024;
-      allow delete: if request.auth != null;
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
