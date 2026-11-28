@@ -84,6 +84,8 @@ class AppRoutes {
   static const String studentResults = '/student/results';
   static const String studentUhpab = '/student/uhpab';
   static const String studentDiscipline = '/student/discipline';
+  static const String studentPlacements = '/student/placements';
+  static const String registrarPlacements = '/registrar/students/placements';
   static const String registrarDiscipline = '/registrar/students/discipline';
   static const String registrarUhpab = '/registrar/students/uhpab';
   static const String bursarResultAccess = '/bursar/results-access';

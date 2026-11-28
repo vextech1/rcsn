@@ -1114,3 +1114,35 @@ describe('disciplinary cases', () => {
     await assertFails(deleteDoc(doc(as('principal1'), 'student_discipline/ABC_1')));
   });
 });
+
+describe('clinical placements', () => {
+  const record = (uid, placements) => ({ nsin: 'ABC/1', placements, updatedBy: uid, updatedAt: serverTimestamp() });
+  const set = (uid, id, value) =>
+    setDoc(doc(as(uid), 'student_placements/ABC_1'), record(uid, { [id]: value }), {
+      mergeFields: ['nsin', `placements.${id}`, 'updatedBy', 'updatedAt'],
+    });
+  const place = { hospital: 'Mulago', activities: 'Rounds', experience: 'Triage', startDate: '2026-12-01', endDate: '2026-12-14' };
+
+  it('the registrar adds and removes one placement at a time', async () => {
+    await assertSucceeds(set('registrar1', 'p1', place));
+    await assertSucceeds(set('registrar1', 'p2', place));
+    await assertSucceeds(set('registrar1', 'p1', deleteField()));
+    const saved = (await getDoc(doc(anon(), 'student_placements/ABC_1'))).data();
+    assert.deepStrictEqual(Object.keys(saved.placements), ['p2']);
+  });
+
+  it('only the registrar writes', async () => {
+    for (const uid of ['principal1', 'deputy1', 'bursar1', 'tutor1', 'registrar2']) {
+      await assertFails(set(uid, 'p1', place));
+    }
+    await assertFails(setDoc(doc(anon(), 'student_placements/ABC_1'), record('x', {})));
+  });
+
+  it('opened by number, never listed or deleted', async () => {
+    await assertSucceeds(set('registrar1', 'p1', place));
+    await assertSucceeds(getDoc(doc(anon(), 'student_placements/ABC_1')));
+    await assertSucceeds(getDoc(doc(as('principal1'), 'student_placements/ABC_1')));
+    await assertFails(getDocs(collection(anon(), 'student_placements')));
+    await assertFails(deleteDoc(doc(as('registrar1'), 'student_placements/ABC_1')));
+  });
+});

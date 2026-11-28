@@ -202,6 +202,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             icon: const Icon(Icons.workspace_premium),
             label: const Text('Open UHPAB results'),
           ),
+          _heading('Clinical placements'),
+          OutlinedButton.icon(
+            onPressed: () => context.push(
+              AppRoutes.registrarPlacements,
+              extra: _student,
+            ),
+            icon: const Icon(Icons.local_hospital),
+            label: const Text('Open clinical placements'),
+          ),
           _heading('Discipline'),
           OutlinedButton.icon(
             onPressed: () => context.push(

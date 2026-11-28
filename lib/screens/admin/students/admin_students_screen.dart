@@ -343,6 +343,11 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                       AppRoutes.registrarDiscipline,
                       extra: student,
                     );
+                  } else if (choice == 'placements') {
+                    context.push(
+                      AppRoutes.registrarPlacements,
+                      extra: student,
+                    );
                   } else if (choice == 'uhpab') {
                     context.push(AppRoutes.registrarUhpab, extra: student);
                   } else {
@@ -357,6 +362,10 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   const PopupMenuItem(
                     value: 'uhpab',
                     child: Text('UHPAB results'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'placements',
+                    child: Text('Clinical placements'),
                   ),
                   const PopupMenuItem(
                     value: 'discipline',

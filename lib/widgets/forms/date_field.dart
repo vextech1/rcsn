@@ -6,14 +6,29 @@ class DateField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
 
-  const DateField({super.key, required this.controller, required this.label});
+  /// Where the calendar opens and how far it goes. The defaults suit a date
+  /// of birth.
+  final DateTime? initialDate;
+  final DateTime? firstDate;
+  final DateTime? lastDate;
+
+  const DateField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.initialDate,
+    this.firstDate,
+    this.lastDate,
+  });
 
   Future<void> _pick(BuildContext context) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(controller.text) ?? DateTime(2005),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
+      initialDate: DateTime.tryParse(controller.text) ??
+          initialDate ??
+          DateTime(2005),
+      firstDate: firstDate ?? DateTime(1940),
+      lastDate: lastDate ?? DateTime.now(),
       // Typing is quicker than scrolling back many years.
       initialEntryMode: DatePickerEntryMode.input,
     );
