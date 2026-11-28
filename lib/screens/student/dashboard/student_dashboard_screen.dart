@@ -18,6 +18,7 @@ import '../../../providers/student_provider.dart';
 import '../../../widgets/common/app_empty_state.dart';
 import '../../../widgets/common/app_error_display.dart';
 import '../../../widgets/common/app_loading_indicator.dart';
+import '../../../widgets/discipline/discipline_tile.dart';
 
 /// The student's landing screen after a successful NSIN lookup.
 ///
@@ -175,6 +176,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.studentFees),
           ),
+
+          DisciplineTile(key: ValueKey(student.nsin), nsin: student.nsin),
 
           const Divider(height: 1),
 

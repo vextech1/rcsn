@@ -902,6 +902,42 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Disciplinary cases, hidden ones included. Never readable by students:
+    // visible cases are copied to student_discipline.
+    match /discipline_cases/{id} {
+      allow read: if isRegistrar() || isPrincipalLevel();
+      allow create, update: if (isRegistrar() || isPrincipalLevel())
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'date', 'offence', 'action', 'status', 'visible',
+              'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && (resource == null
+            || request.resource.data.nsin == resource.data.nsin)
+        && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && request.resource.data.offence is string
+        && request.resource.data.offence.size() >= 1
+        && request.resource.data.offence.size() <= 500
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 500
+        && request.resource.data.status in ['open', 'underReview', 'closed']
+        && request.resource.data.visible is bool
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
+    // The cases a student may see, one document per student. As with results,
+    // whoever knows the student number can open it; nobody can list them.
+    match /student_discipline/{key} {
+      allow get: if true;
+      allow create, update: if (isRegistrar() || isPrincipalLevel())
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'cases', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.get('cases', {}) is map
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
     // Student number formats, set by the Academic Registrar. The app checks
     // numbers against them; public, because students check before signing in.
     match /settings/studentNumber {

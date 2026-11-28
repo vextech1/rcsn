@@ -1057,3 +1057,60 @@ describe('UHPAB results and the Bursar\'s permission', () => {
     await assertFails(deleteDoc(doc(as('bursar1'), 'result_clearance/ABC_1')));
   });
 });
+
+describe('disciplinary cases', () => {
+  const stamp = (uid) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const fields = { date: '2026-11-28', offence: 'Late', action: '', status: 'open' };
+  const record = (uid, extra = {}) => ({ nsin: 'ABC/1', ...fields, visible: false, ...stamp(uid), ...extra });
+  // What the app does: one batch that saves the case and shows or hides it.
+  const save = (uid, visible, id = 'c1') => {
+    const db = as(uid);
+    const batch = writeBatch(db);
+    batch.set(doc(db, `discipline_cases/${id}`), record(uid, { visible }));
+    batch.set(
+      doc(db, 'student_discipline/ABC_1'),
+      { nsin: 'ABC/1', cases: { [id]: visible ? fields : deleteField() }, ...stamp(uid) },
+      { mergeFields: ['nsin', `cases.${id}`, 'updatedBy', 'updatedAt'] },
+    );
+    return batch.commit();
+  };
+  const shown = async () =>
+    Object.keys((await getDoc(doc(anon(), 'student_discipline/ABC_1'))).data().cases || {});
+
+  it('the registrar, principal and deputy record and read cases', async () => {
+    for (const uid of ['registrar1', 'principal1', 'deputy1']) {
+      await assertSucceeds(save(uid, false, uid));
+      await assertSucceeds(getDocs(query(collection(as(uid), 'discipline_cases'), where('nsin', '==', 'ABC/1'))));
+    }
+  });
+
+  it('nobody else records or reads them', async () => {
+    await assertSucceeds(save('registrar1', false));
+    for (const uid of ['bursar1', 'tutor1', 'registrar2', 'deputy2', 'askari1']) {
+      await assertFails(save(uid, true, 'c2'));
+      await assertFails(getDoc(doc(as(uid), 'discipline_cases/c1')));
+    }
+    await assertFails(getDoc(doc(anon(), 'discipline_cases/c1')));
+    await assertFails(setDoc(doc(anon(), 'student_discipline/ABC_1'), { nsin: 'ABC/1', cases: {}, ...stamp('x') }));
+  });
+
+  it('a student sees a case only while it is visible', async () => {
+    await assertSucceeds(save('registrar1', true, 'c1'));
+    await assertSucceeds(save('registrar1', false, 'c2'));
+    assert.deepStrictEqual(await shown(), ['c1']);
+    await assertSucceeds(save('principal1', false, 'c1'));
+    assert.deepStrictEqual(await shown(), []);
+    await assertFails(getDocs(collection(anon(), 'student_discipline')));
+  });
+
+  it('rejects bad fields, moving a case and deleting', async () => {
+    await assertSucceeds(save('registrar1', false));
+    const write = (extra) => setDoc(doc(as('registrar1'), 'discipline_cases/c1'), record('registrar1', extra));
+    for (const bad of [{ offence: '' }, { offence: 'x'.repeat(501) }, { status: 'gone' },
+      { date: 'yesterday' }, { nsin: 'OTHER/2' }, { extra: 1 }]) {
+      await assertFails(write(bad));
+    }
+    await assertFails(deleteDoc(doc(as('principal1'), 'discipline_cases/c1')));
+    await assertFails(deleteDoc(doc(as('principal1'), 'student_discipline/ABC_1')));
+  });
+});
