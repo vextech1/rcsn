@@ -938,6 +938,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Clinical placements, one document per student. As with results,
+    // whoever knows the student number can open it; nobody can list them.
+    match /student_placements/{key} {
+      allow get: if true;
+      allow create, update: if isRegistrar()
+        && request.resource.data.keys().hasOnly(
+             ['nsin', 'placements', 'updatedBy', 'updatedAt'])
+        && request.resource.data.nsin is string
+        && request.resource.data.get('placements', {}) is map
+        && isFeeStamp();
+      allow delete: if false;
+    }
+
     // Student number formats, set by the Academic Registrar. The app checks
     // numbers against them; public, because students check before signing in.
     match /settings/studentNumber {

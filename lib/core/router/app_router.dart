@@ -34,6 +34,8 @@ import '../../screens/registrar/uhpab/uhpab_screen.dart';
 import '../../screens/bursar/results/result_access_screen.dart';
 import '../../screens/registrar/discipline/discipline_screen.dart';
 import '../../screens/student/discipline/student_discipline_screen.dart';
+import '../../screens/registrar/placements/placements_screen.dart';
+import '../../screens/student/placements/student_placements_screen.dart';
 import '../../data/models/student_record.dart';
 import '../../screens/registrar/student_number/student_number_format_screen.dart';
 import '../../screens/bursar/add/bursar_add_fee_screen.dart';
@@ -239,6 +241,15 @@ GoRouter buildAppRouter({
         },
       ),
       GoRoute(
+        path: AppRoutes.registrarPlacements,
+        builder: (_, state) {
+          final extra = state.extra;
+          return extra is StudentRecord
+              ? PlacementsScreen(student: extra)
+              : const AdminStudentsScreen();
+        },
+      ),
+      GoRoute(
         path: AppRoutes.registrarStudentBio,
         // The student travels as `extra`; without it, show the list.
         builder: (_, state) {
@@ -295,6 +306,7 @@ GoRouter buildAppRouter({
       GoRoute(path: AppRoutes.studentResults, builder: (_, __) => const StudentResultsScreen()),
       GoRoute(path: AppRoutes.studentUhpab, builder: (_, __) => const StudentUhpabScreen()),
       GoRoute(path: AppRoutes.studentDiscipline, builder: (_, __) => const StudentDisciplineScreen()),
+      GoRoute(path: AppRoutes.studentPlacements, builder: (_, __) => const StudentPlacementsScreen()),
       GoRoute(path: AppRoutes.studentSettings, builder: (_, __) => const StudentSettingsScreen()),
       GoRoute(path: AppRoutes.studentAccountInactive, builder: (_, __) => const StudentAccountInactiveScreen()),
     ],
